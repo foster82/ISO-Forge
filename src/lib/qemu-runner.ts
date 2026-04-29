@@ -29,33 +29,58 @@ export class QEMURunner {
         '-machine', 'q35',
         '-netdev', 'user,id=net0',
         '-device', 'virtio-net-pci,netdev=net0',
-        '-monitor', 'none'
+        '-monitor', 'none',
+        '-display', 'none',
+        '-serial', 'stdio'
       ]
 
       // Check for UEFI firmware
       const ovmfPath = '/usr/share/ovmf/OVMF.fd'
+      let hasUefi = false
       try {
         await fs.access(ovmfPath)
-        args.push('-bios', ovmfPath)
-        await options.onLog('UEFI firmware (OVMF) detected and enabled.\n')
-      } catch {
-        await options.onLog('UEFI firmware not found, falling back to BIOS.\n')
-      }
+        hasUefi = true
+      } catch {}
 
       if (options.imageType === 'ISO') {
-        // 1. Create a small temporary disk for the installer to see
+        // ISOs usually boot fine with BIOS, but we can use UEFI if available
+        if (hasUefi) {
+          args.push('-bios', ovmfPath)
+          await options.onLog('UEFI firmware (OVMF) enabled for ISO boot.\n')
+        }
+
         await execAsync(`qemu-img create -f qcow2 "${diskPath}" 10G`)
+        
+        // Use if=none and -device for better control
         args.push(
-          '-drive', `file=${options.imagePath},format=raw,media=cdrom,readonly=on`,
-          '-drive', `file=${diskPath},format=qcow2,if=virtio`,
-          '-boot', 'once=d,menu=on'
+          '-drive', `file=${options.imagePath},format=raw,if=none,id=cdrom,readonly=on`,
+          '-device', 'virtio-blk-pci,drive=cdrom,bootindex=0',
+          '-drive', `file=${diskPath},format=qcow2,if=none,id=hd0`,
+          '-device', 'virtio-blk-pci,drive=hd0,bootindex=1'
         )
       } else {
-        // Cloud Image: boot directly from the image
-        const format = options.imagePath.endsWith('.qcow2') ? 'qcow2' : 'raw'
+        // Cloud Images: Many Ubuntu cloud images are hybrid, but let's try UEFI first if available
+        // as modern GPT images often prefer it.
+        if (hasUefi) {
+          args.push('-bios', ovmfPath)
+          await options.onLog('UEFI firmware (OVMF) enabled for Cloud Image boot.\n')
+        }
+
+        // Detect format more reliably
+        let format = 'raw'
+        try {
+          const { stdout } = await execAsync(`qemu-img info "${options.imagePath}" --output=json`)
+          const info = JSON.parse(stdout)
+          format = info.format
+          await options.onLog(`Detected image format: ${format}\n`)
+        } catch {
+          format = options.imagePath.endsWith('.qcow2') ? 'qcow2' : 'raw'
+          await options.onLog(`Failed to detect format via qemu-img, falling back to extension-based: ${format}\n`)
+        }
+
         args.push(
-          '-drive', `file=${options.imagePath},format=${format},if=virtio`,
-          '-boot', 'c'
+          '-drive', `file=${options.imagePath},format=${format},if=none,id=hd0`,
+          '-device', 'virtio-blk-pci,drive=hd0,bootindex=0'
         )
       }
 
