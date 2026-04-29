@@ -5,7 +5,13 @@ import { redirect } from 'next/navigation'
 import { DownloadEngine } from '@/lib/download-engine'
 import path from 'path'
 
-export default async function NewImage() {
+export default async function NewImage({ 
+  searchParams 
+}: { 
+  searchParams: Promise<{ type?: string }> 
+}) {
+  const { type = 'ISO' } = await searchParams
+
   async function addNewImage(formData: FormData) {
     'use server'
     
@@ -48,7 +54,7 @@ export default async function NewImage() {
       })
     })
 
-    redirect('/images')
+    redirect(`/images?type=${imageType}`)
   }
 
   return (
@@ -56,10 +62,10 @@ export default async function NewImage() {
       <header className="bg-white border-b border-slate-200 px-6 py-4">
         <div className="flex items-center justify-between max-w-4xl mx-auto w-full">
           <div className="flex items-center gap-4">
-            <Link href="/images" className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+            <Link href={`/images?type=${type}`} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
               <ArrowLeft className="w-5 h-5 text-slate-600" />
             </Link>
-            <h1 className="text-xl font-bold text-slate-900">Add Base Image</h1>
+            <h1 className="text-xl font-bold text-slate-900">Add Base {type === 'ISO' ? 'ISO' : 'Cloud Image'}</h1>
           </div>
         </div>
       </header>
@@ -81,6 +87,7 @@ export default async function NewImage() {
                 <select 
                   name="imageType" 
                   required
+                  defaultValue={type}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white"
                 >
                   <option value="ISO">ISO (Installer)</option>
@@ -124,7 +131,7 @@ export default async function NewImage() {
           </div>
 
           <div className="flex items-center justify-end gap-4">
-            <Link href="/images" className="px-6 py-2 text-slate-600 font-medium hover:text-slate-900">
+            <Link href={`/images?type=${type}`} className="px-6 py-2 text-slate-600 font-medium hover:text-slate-900">
               Cancel
             </Link>
             <button 

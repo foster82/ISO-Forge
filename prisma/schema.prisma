@@ -29,6 +29,9 @@ model Profile {
   sshKey       String?    // Public SSH key
   packages     String     // JSON array of strings
   configYaml   String?    // Additional cloud-init overrides
+  ipAddress    String?    // Optional static IP (e.g. 192.168.1.10/24)
+  gateway      String?    // Optional gateway
+  dnsServers   String?    // Optional comma-separated DNS
   baseImageId  String
   baseImage    BaseImage  @relation(fields: [baseImageId], references: [id])
   buildJobs    BuildJob[]

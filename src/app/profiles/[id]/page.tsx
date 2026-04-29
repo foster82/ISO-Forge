@@ -1,11 +1,13 @@
 import { prisma } from '@/lib/prisma'
-import { ArrowLeft, Play, Disc, Shield, Globe, Calendar } from 'lucide-react'
+import { ArrowLeft, Play, Disc, Shield, Globe, Calendar, Edit2 } from 'lucide-react'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { BuildEngine } from '@/lib/build-engine'
 import path from 'path'
 import fs from 'fs/promises'
+import fsSync from 'fs'
 import DeleteButton from '@/components/DeleteButton'
+import { revalidatePath } from 'next/cache'
 
 export default async function ProfileDetails({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -22,17 +24,25 @@ export default async function ProfileDetails({ params }: { params: Promise<{ id:
   async function startBuild() {
     'use server'
     
+    // Fetch fresh profile data to avoid closure issues
+    const freshProfile = await prisma.profile.findUnique({
+      where: { id },
+      include: { baseImage: true }
+    })
+
+    if (!freshProfile) return
+
     // 1. Create a BuildJob record
     const job = await prisma.buildJob.create({
       data: {
         profileId: id,
         status: 'BUILDING',
-        log: 'Job started...\n'
+        log: `Job started for image type: ${freshProfile.baseImage.imageType}...\n`
       }
     })
 
-    const extension = profile!.baseImage.imageType === 'ISO' ? 'iso' : 
-                     (profile!.baseImage.filename.split('.').pop() || 'img')
+    const extension = freshProfile.baseImage.imageType === 'ISO' ? 'iso' : 
+                     (freshProfile.baseImage.filename.split('.').pop() || 'img')
     
     const outputPath = path.join(process.cwd(), 'storage', 'builds', `custom-${job.id}.${extension}`)
     
@@ -41,15 +51,18 @@ export default async function ProfileDetails({ params }: { params: Promise<{ id:
 
     // 2. Trigger Build in background
     BuildEngine.createCustomImage({
-      baseIsoPath: profile!.baseImage.path,
-      imageType: profile!.baseImage.imageType as 'ISO' | 'CLOUD_IMAGE',
+      baseIsoPath: freshProfile.baseImage.path,
+      imageType: freshProfile.baseImage.imageType as 'ISO' | 'CLOUD_IMAGE',
       outputPath,
-      hostname: profile!.hostname,
-      username: profile!.username,
-      passwordHash: profile!.passwordHash,
-      sshKey: profile!.sshKey || undefined,
+      hostname: freshProfile.hostname,
+      username: freshProfile.username,
+      passwordHash: freshProfile.passwordHash,
+      sshKey: freshProfile.sshKey || undefined,
       packages,
-      configYaml: profile!.configYaml || undefined,
+      configYaml: freshProfile.configYaml || undefined,
+      ipAddress: freshProfile.ipAddress || undefined,
+      gateway: freshProfile.gateway || undefined,
+      dnsServers: freshProfile.dnsServers ? freshProfile.dnsServers.split(',').map(d => d.trim()) : undefined,
       onLog: async (msg) => {
         const currentJob = await prisma.buildJob.findUnique({ where: { id: job.id } })
         await prisma.buildJob.update({
@@ -83,10 +96,31 @@ export default async function ProfileDetails({ params }: { params: Promise<{ id:
 
   async function deleteProfile() {
     'use server'
-    // Also delete associated build jobs
+    // Also delete associated build files
+    const jobs = await prisma.buildJob.findMany({ where: { profileId: id } })
+    for (const job of jobs) {
+      if (job.outputPath && fsSync.existsSync(job.outputPath)) {
+        fsSync.unlinkSync(job.outputPath)
+      }
+    }
     await prisma.buildJob.deleteMany({ where: { profileId: id } })
     await prisma.profile.delete({ where: { id } })
     redirect('/')
+  }
+
+  async function deleteJob(formData: FormData) {
+    'use server'
+    const jobId = formData.get('id') as string
+    const job = await prisma.buildJob.findUnique({ where: { id: jobId } })
+    
+    if (job) {
+      if (job.outputPath && fsSync.existsSync(job.outputPath)) {
+        fsSync.unlinkSync(job.outputPath)
+      }
+      await prisma.buildJob.delete({ where: { id: jobId } })
+    }
+    
+    revalidatePath(`/profiles/${id}`)
   }
 
   return (
@@ -109,8 +143,15 @@ export default async function ProfileDetails({ params }: { params: Promise<{ id:
             <div className="flex items-center gap-3">
               <DeleteButton 
                 action={deleteProfile} 
-                confirmMessage="Are you sure you want to delete this profile? All associated build jobs will also be deleted."
+                confirmMessage="Are you sure you want to delete this profile? All associated build jobs and files will also be deleted."
               />
+              <Link 
+                href={`/profiles/${id}/edit`}
+                className="inline-flex items-center gap-2 bg-slate-100 text-slate-700 px-4 py-2 rounded-lg font-medium hover:bg-slate-200 transition-colors border border-slate-200"
+              >
+                <Edit2 className="w-4 h-4" />
+                Edit Profile
+              </Link>
               <form action={startBuild}>
                 <button 
                   type="submit"
@@ -174,6 +215,36 @@ export default async function ProfileDetails({ params }: { params: Promise<{ id:
 
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-200 bg-slate-50/50">
+              <h2 className="font-semibold text-slate-900">Network Configuration</h2>
+            </div>
+            <div className="p-6">
+              {profile.ipAddress ? (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500 uppercase">Static IP</p>
+                    <p className="text-sm font-medium text-slate-900">{profile.ipAddress}</p>
+                  </div>
+                  {profile.gateway && (
+                    <div>
+                      <p className="text-xs font-semibold text-slate-500 uppercase">Gateway</p>
+                      <p className="text-sm font-medium text-slate-900">{profile.gateway}</p>
+                    </div>
+                  )}
+                  {profile.dnsServers && (
+                    <div>
+                      <p className="text-xs font-semibold text-slate-500 uppercase">DNS Servers</p>
+                      <p className="text-sm font-medium text-slate-900">{profile.dnsServers}</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-slate-500 italic text-sm">Configured for DHCP (Dynamic IP).</p>
+              )}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-200 bg-slate-50/50">
               <h2 className="font-semibold text-slate-900">Pre-installed Packages</h2>
             </div>
             <div className="p-6">
@@ -218,19 +289,29 @@ export default async function ProfileDetails({ params }: { params: Promise<{ id:
                 </div>
               ) : (
                 profile.buildJobs.map(job => (
-                  <Link key={job.id} href={`/jobs/${job.id}`} className="block p-4 hover:bg-slate-50 transition-colors">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
-                        job.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700' :
-                        job.status === 'FAILED' ? 'bg-red-100 text-red-700' :
-                        job.status === 'BUILDING' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'
-                      }`}>
-                        {job.status}
-                      </span>
-                      <span className="text-[10px] text-slate-400 font-mono">{job.id.substring(0, 8)}</span>
+                  <div key={job.id} className="group relative">
+                    <Link href={`/jobs/${job.id}`} className="block p-4 hover:bg-slate-50 transition-colors">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
+                          job.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700' :
+                          job.status === 'FAILED' ? 'bg-red-100 text-red-700' :
+                          job.status === 'BUILDING' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'
+                        }`}>
+                          {job.status}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-mono">{job.id.substring(0, 8)}</span>
+                      </div>
+                      <p className="text-xs text-slate-500">{new Date(job.createdAt).toLocaleString()}</p>
+                    </Link>
+                    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <DeleteButton 
+                        action={deleteJob}
+                        id={job.id}
+                        confirmMessage="Delete this build job and its output file?"
+                        iconSize={3.5}
+                      />
                     </div>
-                    <p className="text-xs text-slate-500">{new Date(job.createdAt).toLocaleString()}</p>
-                  </Link>
+                  </div>
                 ))
               )}
             </div>

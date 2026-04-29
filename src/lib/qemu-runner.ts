@@ -17,7 +17,7 @@ export class QEMURunner {
   static async testBoot(options: TestOptions): Promise<boolean> {
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'qemu-test-'))
     const diskPath = path.join(tempDir, 'test-disk.qcow2')
-    const timeout = options.timeoutMs || 2700000 // 45 minutes default for non-KVM
+    const timeout = options.timeoutMs || 900000 // 15 minutes default
     
     try {
       await options.onLog('Initializing QEMU test environment...')
@@ -28,21 +28,31 @@ export class QEMURunner {
         '-smp', '2',
         '-netdev', 'user,id=net0',
         '-device', 'virtio-net-pci,netdev=net0',
-        '-nodefaults',
-        '-serial', 'stdio'
+        '-monitor', 'none'
       ]
+
+      // Check for UEFI firmware
+      const ovmfPath = '/usr/share/ovmf/OVMF.fd'
+      let useUefi = false
+      try {
+        await fs.access(ovmfPath)
+        args.push('-bios', ovmfPath)
+        useUefi = true
+        await options.onLog('UEFI firmware (OVMF) detected and enabled.\n')
+      } catch {
+        await options.onLog('UEFI firmware not found, falling back to BIOS.\n')
+      }
 
       if (options.imageType === 'ISO') {
         // 1. Create a small temporary disk for the installer to see
         await execAsync(`qemu-img create -f qcow2 "${diskPath}" 10G`)
         args.push(
-          '-cdrom', options.imagePath,
+          '-drive', `file=${options.imagePath},format=raw,media=cdrom,readonly=on`,
           '-drive', `file=${diskPath},format=qcow2`,
-          '-boot', 'd'
+          '-boot', 'once=d,menu=on'
         )
       } else {
         // Cloud Image: boot directly from the image
-        // We use format=qcow2 but it might be raw, qemu usually detects it or we can check extension
         const format = options.imagePath.endsWith('.qcow2') ? 'qcow2' : 'raw'
         args.push(
           '-drive', `file=${options.imagePath},format=${format}`,
@@ -60,7 +70,7 @@ export class QEMURunner {
         await options.onLog('KVM not available, running with software emulation (slower) using CPU "max".\n')
       }
 
-      const qemu = spawn('qemu-system-x86_64', args)
+      const qemu = spawn('/usr/bin/qemu-system-x86_64', args)
 
       let isSuccess = false
       let output = ''
@@ -77,14 +87,23 @@ export class QEMURunner {
           output += chunk
           await options.onLog(chunk)
 
+          // Strip ANSI escape codes for cleaner matching
+          const cleanOutput = output.replace(/\x1B\[[0-9;]*[JKmsu]/g, '')
+
           // Look for success indicators in the serial output
           const isFinished = 
-            output.includes('login:') || 
-            output.includes('Welcome to Ubuntu') || 
-            (output.includes('Cloud-init') && output.includes('finished')) ||
-            output.includes('subiquity/Success/SUCCESS') ||
-            output.includes('Installation complete!') ||
-            output.includes('REBOOTING')
+            // Final success indicators
+            cleanOutput.includes('login:') || 
+            cleanOutput.includes('Welcome to Ubuntu') || 
+            (cleanOutput.includes('Cloud-init') && cleanOutput.includes('finished')) ||
+            cleanOutput.includes('subiquity/Success/SUCCESS') ||
+            cleanOutput.includes('Installation complete!') ||
+            cleanOutput.includes('REBOOTING') ||
+            // Early "Bootable" indicators
+            cleanOutput.includes('Using CD-ROM mount point') ||
+            cleanOutput.includes('Scanning disc for index files') ||
+            cleanOutput.includes('Linux version') ||
+            (cleanOutput.includes('cloud-init') && cleanOutput.includes('modules:config'))
 
           if (isFinished) {
             clearTimeout(timer)

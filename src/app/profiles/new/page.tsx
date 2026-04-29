@@ -1,12 +1,21 @@
 import { prisma } from '@/lib/prisma'
-import { ArrowLeft, Save, Info } from 'lucide-react'
+import { ArrowLeft, Save, Info, Disc, Server } from 'lucide-react'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { sha512 } from 'sha512-crypt-ts'
 import YamlEditor from '@/components/YamlEditor'
+import { clsx } from 'clsx'
 
-export default async function NewProfile() {
-  const baseImages = await prisma.baseImage.findMany()
+export default async function NewProfile({ 
+  searchParams 
+}: { 
+  searchParams: Promise<{ type?: string }> 
+}) {
+  const { type = 'ISO' } = await searchParams
+  
+  const baseImages = await prisma.baseImage.findMany({
+    where: { imageType: type, status: 'READY' }
+  })
 
   async function createProfile(formData: FormData) {
     'use server'
@@ -19,6 +28,10 @@ export default async function NewProfile() {
     const packagesRaw = formData.get('packages') as string
     const configYaml = formData.get('configYaml') as string
     
+    const ipAddress = formData.get('ipAddress') as string
+    const gateway = formData.get('gateway') as string
+    const dnsServers = formData.get('dnsServers') as string
+
     const passwordMode = formData.get('passwordMode') as string // 'plain' or 'hash'
     const passwordInput = formData.get('passwordInput') as string
     
@@ -46,7 +59,10 @@ export default async function NewProfile() {
         passwordHash,
         sshKey,
         packages: JSON.stringify(packages),
-        configYaml: configYaml || null
+        configYaml: configYaml || null,
+        ipAddress: ipAddress || null,
+        gateway: gateway || null,
+        dnsServers: dnsServers || null
       }
     })
 
@@ -61,7 +77,9 @@ export default async function NewProfile() {
             <Link href="/" className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
               <ArrowLeft className="w-5 h-5 text-slate-600" />
             </Link>
-            <h1 className="text-xl font-bold text-slate-900">Create Deployment Profile</h1>
+            <h1 className="text-xl font-bold text-slate-900">
+              New {type === 'ISO' ? 'ISO Customization' : 'Cloud Instance'} Profile
+            </h1>
           </div>
           <Link href="/images" className="text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">
             Base Images
@@ -70,6 +88,29 @@ export default async function NewProfile() {
       </header>
 
       <main className="flex-1 max-w-4xl mx-auto w-full p-6">
+        <div className="mb-8 flex items-center p-1 bg-slate-200 rounded-xl w-fit">
+          <Link 
+            href="/profiles/new?type=ISO"
+            className={clsx(
+              "px-6 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all",
+              type === 'ISO' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-600 hover:text-slate-900"
+            )}
+          >
+            <Disc className="w-4 h-4" />
+            ISO Profile
+          </Link>
+          <Link 
+            href="/profiles/new?type=CLOUD_IMAGE"
+            className={clsx(
+              "px-6 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all",
+              type === 'CLOUD_IMAGE' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-600 hover:text-slate-900"
+            )}
+          >
+            <Server className="w-4 h-4" />
+            Cloud Profile
+          </Link>
+        </div>
+
         <form action={createProfile} className="space-y-8">
           {/* Basic Info */}
           <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
@@ -86,16 +127,22 @@ export default async function NewProfile() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">Base Image</label>
+                <label className="text-sm font-medium text-slate-700">Base Image ({type === 'ISO' ? 'ISOs' : 'Cloud Images'})</label>
                 <select 
                   name="baseImageId" 
                   required
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white"
                 >
+                  <option value="">Select a base image...</option>
                   {baseImages.map(img => (
-                    <option key={img.id} value={img.id}>{img.name}</option>
+                    <option key={img.id} value={img.id}>{img.name} (v{img.version})</option>
                   ))}
                 </select>
+                {baseImages.length === 0 && (
+                  <p className="text-xs text-red-500 mt-1">
+                    No ready {type === 'ISO' ? 'ISO' : 'Cloud'} images found. <Link href="/images/new" className="underline">Add one first.</Link>
+                  </p>
+                )}
               </div>
             </div>
           </section>
@@ -165,9 +212,44 @@ export default async function NewProfile() {
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-xs focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
               ></textarea>
             </div>
-          </section>
+            </section>
 
-          {/* Packages */}
+            {/* Networking */}
+            <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+            <h2 className="text-lg font-semibold text-slate-900 border-b pb-2">Networking (Optional Static IP)</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">Static IP / CIDR</label>
+                <input 
+                  name="ipAddress" 
+                  type="text" 
+                  placeholder="e.g. 192.168.1.50/24"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">Gateway</label>
+                <input 
+                  name="gateway" 
+                  type="text" 
+                  placeholder="e.g. 192.168.1.1"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">DNS Servers</label>
+                <input 
+                  name="dnsServers" 
+                  type="text" 
+                  placeholder="8.8.8.8, 1.1.1.1"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-slate-500">Leave blank for DHCP. If providing a static IP, ensure you include the CIDR suffix (e.g. /24).</p>
+            </section>
+
+            {/* Packages */}
           <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
             <h2 className="text-lg font-semibold text-slate-900 border-b pb-2">Software Packages</h2>
             <div className="space-y-2">
@@ -186,7 +268,9 @@ export default async function NewProfile() {
           <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
             <div className="flex items-center gap-2 border-b pb-2">
               <h2 className="text-lg font-semibold text-slate-900">Advanced Configuration</h2>
-              <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 text-[10px] font-bold uppercase rounded tracking-wider">Cloud-Init / Autoinstall</span>
+              <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 text-[10px] font-bold uppercase rounded tracking-wider">
+                {type === 'ISO' ? 'Autoinstall' : 'Cloud-Init'} Overrides
+              </span>
             </div>
             <YamlEditor name="configYaml" />
           </section>
