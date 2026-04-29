@@ -26,6 +26,7 @@ export class QEMURunner {
         '-nographic',
         '-m', '4096',
         '-smp', '2',
+        '-machine', 'q35',
         '-netdev', 'user,id=net0',
         '-device', 'virtio-net-pci,netdev=net0',
         '-monitor', 'none'
@@ -33,11 +34,9 @@ export class QEMURunner {
 
       // Check for UEFI firmware
       const ovmfPath = '/usr/share/ovmf/OVMF.fd'
-      let useUefi = false
       try {
         await fs.access(ovmfPath)
         args.push('-bios', ovmfPath)
-        useUefi = true
         await options.onLog('UEFI firmware (OVMF) detected and enabled.\n')
       } catch {
         await options.onLog('UEFI firmware not found, falling back to BIOS.\n')
@@ -48,14 +47,14 @@ export class QEMURunner {
         await execAsync(`qemu-img create -f qcow2 "${diskPath}" 10G`)
         args.push(
           '-drive', `file=${options.imagePath},format=raw,media=cdrom,readonly=on`,
-          '-drive', `file=${diskPath},format=qcow2`,
+          '-drive', `file=${diskPath},format=qcow2,if=virtio`,
           '-boot', 'once=d,menu=on'
         )
       } else {
         // Cloud Image: boot directly from the image
         const format = options.imagePath.endsWith('.qcow2') ? 'qcow2' : 'raw'
         args.push(
-          '-drive', `file=${options.imagePath},format=${format}`,
+          '-drive', `file=${options.imagePath},format=${format},if=virtio`,
           '-boot', 'c'
         )
       }

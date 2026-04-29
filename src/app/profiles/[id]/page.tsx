@@ -49,6 +49,9 @@ export default async function ProfileDetails({ params }: { params: Promise<{ id:
     // Ensure builds directory exists
     await fs.mkdir(path.join(process.cwd(), 'storage', 'builds'), { recursive: true })
 
+    // Use a queue to prevent logging race conditions
+    let logQueue = Promise.resolve()
+
     // 2. Trigger Build in background
     BuildEngine.createCustomImage({
       baseIsoPath: freshProfile.baseImage.path,
@@ -63,11 +66,21 @@ export default async function ProfileDetails({ params }: { params: Promise<{ id:
       ipAddress: freshProfile.ipAddress || undefined,
       gateway: freshProfile.gateway || undefined,
       dnsServers: freshProfile.dnsServers ? freshProfile.dnsServers.split(',').map(d => d.trim()) : undefined,
-      onLog: async (msg) => {
-        const currentJob = await prisma.buildJob.findUnique({ where: { id: job.id } })
-        await prisma.buildJob.update({
-          where: { id: job.id },
-          data: { log: (currentJob?.log || '') + msg + '\n' }
+      onLog: (msg) => {
+        logQueue = logQueue.then(async () => {
+          try {
+            await prisma.buildJob.update({
+              where: { id: job.id },
+              data: { log: { append: msg + '\n' } } as any // Trying Prisma's append if supported, else fallback
+            })
+          } catch {
+            // Fallback for adapters that don't support atomic append
+            const currentJob = await prisma.buildJob.findUnique({ where: { id: job.id } })
+            await prisma.buildJob.update({
+              where: { id: job.id },
+              data: { log: (currentJob?.log || '') + msg + '\n' }
+            })
+          }
         })
       }
     }).then(async () => {

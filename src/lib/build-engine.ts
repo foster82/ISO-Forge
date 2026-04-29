@@ -79,13 +79,15 @@ export class BuildEngine {
       // 3. Inject files using virt-customize
       options.onLog('Injecting cloud-init data into image via virt-customize...')
       // We inject into /var/lib/cloud/seed/nocloud-net/ which is a standard location
-      const cmd = `/usr/bin/virt-customize -a "${options.outputPath}" \
-        --mkdir /var/lib/cloud/seed/nocloud-net \
-        --copy-in "${userDataPath}":/var/lib/cloud/seed/nocloud-net \
-        --copy-in "${metaDataPath}":/var/lib/cloud/seed/nocloud-net \
-        --run-command "chmod 600 /var/lib/cloud/seed/nocloud-net/*"`
+      const args = [
+        '-a', options.outputPath,
+        '--mkdir', '/var/lib/cloud/seed/nocloud-net',
+        '--copy-in', `${userDataPath}:/var/lib/cloud/seed/nocloud-net`,
+        '--copy-in', `${metaDataPath}:/var/lib/cloud/seed/nocloud-net`,
+        '--run-command', 'chmod 600 /var/lib/cloud/seed/nocloud-net/*'
+      ]
       
-      await execAsync(cmd)
+      await this.runCommand('/usr/bin/virt-customize', args, options)
 
       options.onLog('Cloud Image build completed successfully.')
       options.onLog('\n' + '='.repeat(50))
