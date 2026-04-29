@@ -1,36 +1,70 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ISO Forge 🚀
 
-## Getting Started
+ISO Forge is a full-stack Next.js application designed to automate the customization of Ubuntu ISOs and Cloud Images. It provides a web-based interface for creating "Profiles" that define how an OS should be automatically installed or configured using `cloud-init` and `autoinstall`.
 
-First, run the development server:
+## ✨ Features
+
+- **ISO Customization:** Inject `autoinstall` configurations into official Ubuntu Server ISOs.
+- **Cloud Image Injection:** Pre-configure Cloud Images (QCOW2/IMG) using `virt-customize`.
+- **Profile Management:** Create, edit, and manage multiple OS configuration profiles.
+- **Automated Boot Testing:** Integrated QEMU runner to verify that your customized images boot successfully in a virtual environment.
+- **Serial Console Capture:** Live capture of serial output during boot tests for debugging.
+- **Identity & Auth:** Automated SHA-512 password hashing and SSH key injection.
+- **Advanced Overrides:** Direct YAML editor for complex `cloud-init` or `autoinstall` keys.
+
+## 🛠️ Technology Stack
+
+- **Framework:** [Next.js 15+](https://nextjs.org) (App Router)
+- **Database:** [Prisma](https://prisma.io) with SQLite
+- **Styling:** [Tailwind CSS](https://tailwindcss.com) & [Lucide React](https://lucide.dev)
+- **Hashing:** `sha512-crypt-ts` (Ubuntu/Debian compatible hashes)
+- **Backend Tools:** `xorriso`, `7z`, `qemu-system-x86_64`, `virt-customize`
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+Ensure you have the following tools installed on your host system:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+sudo apt update
+sudo apt install p7zip-full xorriso qemu-system-x86 ovmf libguestfs-tools
 ```
+
+### Installation
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/foster82/ISO-Forge.git
+   cd ISO-Forge
+   ```
+
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+3. **Initialize the database:**
+   ```bash
+   npx prisma generate
+   npx prisma db push
+   ```
+
+4. **Run the development server:**
+   ```bash
+   npm run dev
+   ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 📁 Directory Structure
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `src/app`: Next.js pages and API routes.
+- `src/lib`: Core logic including `BuildEngine` and `QEMURunner`.
+- `src/components`: Reusable UI components.
+- `storage/base`: Directory for official base ISOs/Images.
+- `storage/builds`: Directory where customized outputs are saved.
 
-## Learn More
+## 🛡️ License
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+This project is open-source. Please refer to the LICENSE file for more details.
