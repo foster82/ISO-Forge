@@ -1,0 +1,50 @@
+generator client {
+  provider = "prisma-client"
+  output   = "./generated/client"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model BaseImage {
+  id          String     @id @default(cuid())
+  name        String     // e.g. Ubuntu 24.04 Server
+  version     String
+  filename    String
+  path        String     // Path to the downloaded file
+  imageType   String     @default("ISO") // ISO, CLOUD_IMAGE
+  status      String     @default("READY") // READY, DOWNLOADING, FAILED
+  downloadUrl String?
+  createdAt   DateTime   @default(now())
+  profiles    Profile[]
+}
+
+model Profile {
+  id           String     @id @default(cuid())
+  name         String
+  hostname     String     @default("ubuntu-server")
+  username     String     @default("ubuntu")
+  passwordHash String     // hashed password for autoinstall
+  sshKey       String?    // Public SSH key
+  packages     String     // JSON array of strings
+  configYaml   String?    // Additional cloud-init overrides
+  baseImageId  String
+  baseImage    BaseImage  @relation(fields: [baseImageId], references: [id])
+  buildJobs    BuildJob[]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model BuildJob {
+  id             String    @id @default(cuid())
+  status         String    @default("PENDING") // PENDING, BUILDING, COMPLETED, FAILED
+  log            String    @default("")
+  outputPath     String?
+  bootTestStatus String?   // PENDING, RUNNING, PASSED, FAILED
+  bootTestLog    String?   @default("")
+  profileId      String
+  profile        Profile   @relation(fields: [profileId], references: [id])
+  createdAt      DateTime  @default(now())
+  completedAt    DateTime?
+}
