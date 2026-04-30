@@ -9,4 +9,6 @@ services:
       - ./data:/app/data
     environment:
       - DATABASE_URL=file:/app/data/iso-forge.db
+      - AUTH_SECRET=CXs95ZP0G3Xm7lnFCwX/++zbE2/CM0zOkrWFlatEn90=
+      - NEXTAUTH_URL=http://localhost:3000
     restart: unless-stopped
