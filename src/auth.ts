@@ -4,8 +4,10 @@ import bcrypt from "bcryptjs"
 import { prisma } from "@/lib/prisma"
 import { getSettings } from "@/lib/settings"
 import { authenticateLDAP } from "@/lib/ldap"
+import { authConfig } from "./auth.config"
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  ...authConfig,
   providers: [
     Credentials({
       name: "Credentials",
@@ -80,28 +82,4 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
     }),
   ],
-  callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.role = (user as any).role
-        token.username = (user as any).username
-        token.authSource = (user as any).authSource
-      }
-      return token
-    },
-    async session({ session, token }) {
-      if (session.user) {
-        (session.user as any).role = token.role
-        (session.user as any).username = token.username
-        (session.user as any).authSource = token.authSource
-      }
-      return session
-    },
-  },
-  pages: {
-    signIn: "/login",
-  },
-  session: {
-    strategy: "jwt",
-  },
 })

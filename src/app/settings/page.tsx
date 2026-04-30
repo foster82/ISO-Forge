@@ -13,7 +13,7 @@ export default async function SettingsPage() {
   async function updateSettings(formData: FormData) {
     'use server'
     await requireAdmin()
-...
+    
     const companyName = formData.get('companyName') as string
     const companyLogo = formData.get('companyLogo') as string
     const authType = formData.get('authType') as string

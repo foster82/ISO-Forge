@@ -21,7 +21,7 @@ export default async function NewImage({
   async function addNewImage(formData: FormData) {
     'use server'
     await requireAdmin()
-...
+    
     const name = formData.get('name') as string
     const version = formData.get('version') as string
     const imageType = formData.get('imageType') as string

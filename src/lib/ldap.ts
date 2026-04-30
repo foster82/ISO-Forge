@@ -36,7 +36,7 @@ export async function authenticateLDAP(username: string, password: string, confi
           }
 
           let found = false;
-          res.on('searchEntry', (entry) => {
+          res.on('searchEntry', (entry: any) => {
             found = true;
             const user = entry.object;
             client.unbind();
@@ -79,7 +79,7 @@ export async function authenticateLDAP(username: string, password: string, confi
             return resolve(null);
           }
 
-          res.on('searchEntry', (entry) => {
+          res.on('searchEntry', (entry: any) => {
             bindAndSearch(entry.objectName);
           });
 
