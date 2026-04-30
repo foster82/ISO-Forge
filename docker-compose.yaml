@@ -7,8 +7,6 @@ services:
     volumes:
       - ./storage:/app/storage
       - ./data:/app/data
-    devices:
-      - /dev/kvm:/dev/kvm
     environment:
       - DATABASE_URL=file:/app/data/iso-forge.db
     restart: unless-stopped
