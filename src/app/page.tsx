@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { getSettings } from '@/lib/settings'
 import { Plus, Disc, FileText, Settings, Rocket, Clock, ChevronRight, Edit2, Server } from 'lucide-react'
 import Link from 'next/link'
 import DeleteButton from '@/components/DeleteButton'
@@ -15,6 +16,7 @@ interface ProfileWithBaseImage {
 }
 
 export default async function Dashboard() {
+  const settings = await getSettings()
   const buildJobs = await prisma.buildJob.findMany({
     include: { profile: true },
     orderBy: { createdAt: 'desc' },
@@ -50,20 +52,29 @@ export default async function Dashboard() {
     <div className="flex flex-col min-h-screen bg-slate-50">
       <header className="bg-white border-b border-slate-200 px-6 py-4">
         <div className="flex items-center justify-between max-w-7xl mx-auto">
-          <div className="flex items-center gap-2">
-            <Rocket className="w-8 h-8 text-indigo-600" />
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">ISO Forge</h1>
+          <div className="flex items-center gap-3">
+            {settings.companyLogo ? (
+              <img src={settings.companyLogo} alt="Logo" className="w-10 h-10 object-contain" />
+            ) : (
+              <Rocket className="w-8 h-8 text-indigo-600" />
+            )}
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">{settings.companyName}</h1>
           </div>
-          <div className="flex items-center gap-4">
-            <Link href="/images" className="text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">
-              Base Images
-            </Link>
+          <div className="flex items-center gap-6">
+            <nav className="flex items-center gap-4">
+              <Link href="/images" className="text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">
+                Base Images
+              </Link>
+              <Link href="/settings" className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-slate-50 rounded-lg transition-all" title="Settings">
+                <Settings className="w-5 h-5" />
+              </Link>
+            </nav>
             <div className="flex items-center gap-2">
-              <Link href="/profiles/new?type=ISO" className="inline-flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-indigo-700 transition-colors shadow-sm">
+              <Link href="/profiles/new?type=ISO" className="inline-flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-indigo-700 transition-colors shadow-sm text-sm">
                 <Plus className="w-4 h-4" />
                 New ISO Profile
               </Link>
-              <Link href="/profiles/new?type=CLOUD_IMAGE" className="inline-flex items-center gap-2 bg-slate-800 text-white px-4 py-2 rounded-lg font-medium hover:bg-slate-900 transition-colors shadow-sm">
+              <Link href="/profiles/new?type=CLOUD_IMAGE" className="inline-flex items-center gap-2 bg-slate-800 text-white px-4 py-2 rounded-lg font-medium hover:bg-slate-900 transition-colors shadow-sm text-sm">
                 <Plus className="w-4 h-4" />
                 New Cloud Profile
               </Link>

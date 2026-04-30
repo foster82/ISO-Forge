@@ -51,3 +51,30 @@ model BuildJob {
   createdAt      DateTime  @default(now())
   completedAt    DateTime?
 }
+
+model GlobalSettings {
+  id           String   @id @default("default")
+  companyName  String   @default("ISO Forge")
+  companyLogo  String?  // Base64 or path to logo
+  
+  // Auth Settings
+  authType     String   @default("LOCAL") // LOCAL, LDAP, BOTH
+  ldapUrl      String?
+  ldapBaseDn   String?
+  ldapBindDn   String?
+  ldapBindPw   String?
+  ldapFilter   String?  @default("(uid={{username}})")
+
+  updatedAt    DateTime @updatedAt
+}
+
+model User {
+  id            String    @id @default(cuid())
+  username      String    @unique
+  name          String?
+  password      String?   // Hashed local password
+  role          String    @default("USER") // ADMIN, USER
+  authSource    String    @default("LOCAL") // LOCAL, LDAP
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}

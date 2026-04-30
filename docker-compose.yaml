@@ -1,0 +1,14 @@
+services:
+  iso-forge:
+    build: .
+    container_name: iso-forge
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./storage:/app/storage
+      - ./data:/app/data
+    devices:
+      - /dev/kvm:/dev/kvm
+    environment:
+      - DATABASE_URL=file:/app/data/iso-forge.db
+    restart: unless-stopped

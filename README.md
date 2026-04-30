@@ -7,31 +7,22 @@ ISO Forge is a full-stack Next.js application designed to automate the customiza
 - **ISO Customization:** Inject `autoinstall` configurations into official Ubuntu Server ISOs.
 - **Cloud Image Injection:** Pre-configure Cloud Images (QCOW2/IMG) using `virt-customize`.
 - **Profile Management:** Create, edit, and manage multiple OS configuration profiles.
-- **Automated Boot Testing:** Integrated QEMU runner to verify that your customized images boot successfully in a virtual environment.
-- **Serial Console Capture:** Live capture of serial output during boot tests for debugging.
-- **Identity & Auth:** Automated SHA-512 password hashing and SSH key injection.
-- **Advanced Overrides:** Direct YAML editor for complex `cloud-init` or `autoinstall` keys.
+- **Automated Boot Testing:** Integrated QEMU runner to verify that your customized images boot successfully in a virtual environment (KVM accelerated).
+- **Authentication:** Secure login supporting both **Local Database** accounts and **LDAP/Active Directory** integration.
+- **Custom Branding:** Global settings to configure company name and logo across the application.
+- **Flexible Image Sourcing:** Download base images via URL or upload them directly from your local machine.
 
 ## 🛠️ Technology Stack
 
-- **Framework:** [Next.js 15+](https://nextjs.org) (App Router)
+- **Framework:** [Next.js 15+](https://nextjs.org) (App Router, Standalone mode)
+- **Authentication:** [Auth.js (v5)](https://authjs.dev)
 - **Database:** [Prisma](https://prisma.io) with SQLite
 - **Styling:** [Tailwind CSS](https://tailwindcss.com) & [Lucide React](https://lucide.dev)
-- **Hashing:** `sha512-crypt-ts` (Ubuntu/Debian compatible hashes)
-- **Backend Tools:** `xorriso`, `7z`, `qemu-system-x86_64`, `virt-customize`
+- **Backend Tools:** `xorriso`, `7z`, `qemu-system-x86_64`, `virt-customize` (libguestfs)
 
-## 🚀 Getting Started
+## 🐳 Docker Deployment (Recommended)
 
-### Prerequisites
-
-Ensure you have the following tools installed on your host system:
-
-```bash
-sudo apt update
-sudo apt install p7zip-full xorriso qemu-system-x86 ovmf libguestfs-tools
-```
-
-### Installation
+The easiest way to run ISO Forge is using Docker Compose, which bundles all system dependencies.
 
 1. **Clone the repository:**
    ```bash
@@ -39,31 +30,49 @@ sudo apt install p7zip-full xorriso qemu-system-x86 ovmf libguestfs-tools
    cd ISO-Forge
    ```
 
-2. **Install dependencies:**
+2. **Start with Docker Compose:**
+   ```bash
+   docker-compose up -d --build
+   ```
+
+Open [http://localhost:3000](http://localhost:3000) to access the app.
+- **Default Credentials:** `admin` / `admin`
+
+## 🚀 Manual Installation
+
+### Prerequisites
+
+Ensure you have the following tools installed on your host system:
+```bash
+sudo apt update
+sudo apt install p7zip-full xorriso qemu-system-x86 ovmf libguestfs-tools wget
+```
+
+### Setup
+
+1. **Install dependencies:**
    ```bash
    npm install
    ```
 
-3. **Initialize the database:**
+2. **Initialize the database:**
    ```bash
    npx prisma generate
    npx prisma db push
    ```
 
-4. **Run the development server:**
+3. **Run the development server:**
    ```bash
    npm run dev
    ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
 ## 📁 Directory Structure
 
-- `src/app`: Next.js pages and API routes.
-- `src/lib`: Core logic including `BuildEngine` and `QEMURunner`.
+- `src/app`: Next.js pages, API routes, and Server Actions.
+- `src/lib`: Core logic including `BuildEngine`, `QEMURunner`, and LDAP integration.
 - `src/components`: Reusable UI components.
-- `storage/base`: Directory for official base ISOs/Images.
-- `storage/builds`: Directory where customized outputs are saved.
+- `storage/`: Persistent storage for base images (`base/`) and customized outputs (`builds/`).
+- `data/`: Directory for the SQLite database (in Docker).
 
 ## 🛡️ License
 
