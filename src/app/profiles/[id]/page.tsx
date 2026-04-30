@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { isAdmin, requireAdmin, requireAuth } from '@/lib/auth-utils'
 import { ArrowLeft, Play, Disc, Shield, Globe, Calendar, Edit2 } from 'lucide-react'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
@@ -10,7 +11,9 @@ import DeleteButton from '@/components/DeleteButton'
 import { revalidatePath } from 'next/cache'
 
 export default async function ProfileDetails({ params }: { params: Promise<{ id: string }> }) {
+  await requireAuth()
   const { id } = await params
+  const isUserAdmin = await isAdmin()
   
   const profile = await prisma.profile.findUnique({
     where: { id },
@@ -23,6 +26,7 @@ export default async function ProfileDetails({ params }: { params: Promise<{ id:
 
   async function startBuild() {
     'use server'
+    await requireAuth()
     
     // Fetch fresh profile data to avoid closure issues
     const freshProfile = await prisma.profile.findUnique({
@@ -109,6 +113,7 @@ export default async function ProfileDetails({ params }: { params: Promise<{ id:
 
   async function deleteProfile() {
     'use server'
+    await requireAdmin()
     // Also delete associated build files
     const jobs = await prisma.buildJob.findMany({ where: { profileId: id } })
     for (const job of jobs) {
@@ -123,6 +128,7 @@ export default async function ProfileDetails({ params }: { params: Promise<{ id:
 
   async function deleteJob(formData: FormData) {
     'use server'
+    await requireAdmin()
     const jobId = formData.get('id') as string
     const job = await prisma.buildJob.findUnique({ where: { id: jobId } })
     
@@ -154,13 +160,14 @@ export default async function ProfileDetails({ params }: { params: Promise<{ id:
               Base Images
             </Link>
             <div className="flex items-center gap-3">
-              <DeleteButton 
-                action={deleteProfile} 
-                confirmMessage="Are you sure you want to delete this profile? All associated build jobs and files will also be deleted."
-              />
+              {isUserAdmin && (
+                <DeleteButton 
+                  action={deleteProfile} 
+                  confirmMessage="Are you sure you want to delete this profile? All associated build jobs and files will also be deleted."
+                />
+              )}
               <Link 
-                href={`/profiles/${id}/edit`}
-                className="inline-flex items-center gap-2 bg-slate-100 text-slate-700 px-4 py-2 rounded-lg font-medium hover:bg-slate-200 transition-colors border border-slate-200"
+                href={`/profiles/${id}/edit`}                className="inline-flex items-center gap-2 bg-slate-100 text-slate-700 px-4 py-2 rounded-lg font-medium hover:bg-slate-200 transition-colors border border-slate-200"
               >
                 <Edit2 className="w-4 h-4" />
                 Edit Profile
@@ -317,12 +324,14 @@ export default async function ProfileDetails({ params }: { params: Promise<{ id:
                       <p className="text-xs text-slate-500">{new Date(job.createdAt).toLocaleString()}</p>
                     </Link>
                     <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <DeleteButton 
-                        action={deleteJob}
-                        id={job.id}
-                        confirmMessage="Delete this build job and its output file?"
-                        iconSize={3.5}
-                      />
+                      {isUserAdmin && (
+                        <DeleteButton 
+                          action={deleteJob}
+                          id={job.id}
+                          confirmMessage="Delete this build job and its output file?"
+                          iconSize={3.5}
+                        />
+                      )}
                     </div>
                   </div>
                 ))

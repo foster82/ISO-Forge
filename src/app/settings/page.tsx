@@ -1,16 +1,19 @@
 import { prisma } from '@/lib/prisma'
 import { getSettings } from '@/lib/settings'
+import { requireAdmin } from '@/lib/auth-utils'
 import { ArrowLeft, Save, Building, Image as ImageIcon, Shield, Network } from 'lucide-react'
 import Link from 'next/link'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
 export default async function SettingsPage() {
+  await requireAdmin()
   const settings = await getSettings()
 
   async function updateSettings(formData: FormData) {
     'use server'
-    
+    await requireAdmin()
+...
     const companyName = formData.get('companyName') as string
     const companyLogo = formData.get('companyLogo') as string
     const authType = formData.get('authType') as string

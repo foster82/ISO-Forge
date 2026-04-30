@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { isAdmin, requireAdmin, requireAuth } from '@/lib/auth-utils'
 import { ArrowLeft, Clock, CheckCircle, XCircle, Terminal, Download, Play, ShieldCheck } from 'lucide-react'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
@@ -9,7 +10,9 @@ import AutoRefresh from '@/components/AutoRefresh'
 import LogViewer from '@/components/LogViewer'
 
 export default async function JobDetails({ params }: { params: Promise<{ id: string }> }) {
+  await requireAuth()
   const { id } = await params
+  const isUserAdmin = await isAdmin()
 
   const job = await prisma.buildJob.findUnique({
     where: { id },
@@ -22,6 +25,7 @@ export default async function JobDetails({ params }: { params: Promise<{ id: str
 
   async function deleteJob() {
     'use server'
+    await requireAdmin()
     if (job?.outputPath && fs.existsSync(job.outputPath)) {
       fs.unlinkSync(job.outputPath)
     }
@@ -31,6 +35,7 @@ export default async function JobDetails({ params }: { params: Promise<{ id: str
 
   async function runBootTest() {
     'use server'
+    await requireAuth()
     
     if (!job?.outputPath) return
 
@@ -89,10 +94,12 @@ export default async function JobDetails({ params }: { params: Promise<{ id: str
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <DeleteButton 
-              action={deleteJob}
-              confirmMessage={`Are you sure you want to delete this build job and its ${job.profile.baseImage.imageType === 'ISO' ? 'ISO' : 'Image'}?`}
-            />
+            {isUserAdmin && (
+              <DeleteButton 
+                action={deleteJob}
+                confirmMessage={`Are you sure you want to delete this build job and its ${job.profile.baseImage.imageType === 'ISO' ? 'ISO' : 'Image'}?`}
+              />
+            )}
             {job.status === 'COMPLETED' && !job.bootTestStatus && (
               <form action={runBootTest}>
                 <button 

@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { requireAuth } from '@/lib/auth-utils'
 import { ArrowLeft, Save, Info, Disc, Server } from 'lucide-react'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
@@ -11,6 +12,7 @@ export default async function NewProfile({
 }: { 
   searchParams: Promise<{ type?: string }> 
 }) {
+  await requireAuth()
   const { type = 'ISO' } = await searchParams
   
   const baseImages = await prisma.baseImage.findMany({
@@ -19,6 +21,7 @@ export default async function NewProfile({
 
   async function createProfile(formData: FormData) {
     'use server'
+    await requireAuth()
     
     const name = formData.get('name') as string
     const baseImageId = formData.get('baseImageId') as string

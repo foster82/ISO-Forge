@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { requireAdmin } from '@/lib/auth-utils'
 import { ArrowLeft, Download, Info, Upload } from 'lucide-react'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
@@ -14,11 +15,13 @@ export default async function NewImage({
 }: { 
   searchParams: Promise<{ type?: string }> 
 }) {
+  await requireAdmin()
   const { type = 'ISO' } = await searchParams
 
   async function addNewImage(formData: FormData) {
     'use server'
-    
+    await requireAdmin()
+...
     const name = formData.get('name') as string
     const version = formData.get('version') as string
     const imageType = formData.get('imageType') as string

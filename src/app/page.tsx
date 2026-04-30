@@ -1,6 +1,8 @@
 import { prisma } from '@/lib/prisma'
 import { getSettings } from '@/lib/settings'
-import { Plus, Disc, FileText, Settings, Rocket, Clock, ChevronRight, Edit2, Server } from 'lucide-react'
+import { isAdmin, requireAdmin } from '@/lib/auth-utils'
+import { signOut } from '@/auth'
+import { Plus, Disc, FileText, Settings, Rocket, Clock, ChevronRight, Edit2, Server, LogOut } from 'lucide-react'
 import Link from 'next/link'
 import DeleteButton from '@/components/DeleteButton'
 import fs from 'fs'
@@ -17,6 +19,8 @@ interface ProfileWithBaseImage {
 
 export default async function Dashboard() {
   const settings = await getSettings()
+  const isUserAdmin = await isAdmin()
+
   const buildJobs = await prisma.buildJob.findMany({
     include: { profile: true },
     orderBy: { createdAt: 'desc' },
@@ -35,6 +39,7 @@ export default async function Dashboard() {
 
   async function deleteJob(formData: FormData) {
     'use server'
+    await requireAdmin()
     const id = formData.get('id') as string
     const job = await prisma.buildJob.findUnique({ where: { id } })
     
@@ -65,9 +70,11 @@ export default async function Dashboard() {
               <Link href="/images" className="text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">
                 Base Images
               </Link>
-              <Link href="/settings" className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-slate-50 rounded-lg transition-all" title="Settings">
-                <Settings className="w-5 h-5" />
-              </Link>
+              {isUserAdmin && (
+                <Link href="/settings" className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-slate-50 rounded-lg transition-all" title="Settings">
+                  <Settings className="w-5 h-5" />
+                </Link>
+              )}
             </nav>
             <div className="flex items-center gap-2">
               <Link href="/profiles/new?type=ISO" className="inline-flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-indigo-700 transition-colors shadow-sm text-sm">
@@ -79,6 +86,11 @@ export default async function Dashboard() {
                 New Cloud Profile
               </Link>
             </div>
+            <form action={async () => { 'use server'; await signOut() }}>
+              <button type="submit" className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all" title="Sign Out">
+                <LogOut className="w-5 h-5" />
+              </button>
+            </form>
           </div>
         </div>
       </header>
@@ -193,14 +205,16 @@ export default async function Dashboard() {
                       <p className="text-sm font-medium text-slate-900 truncate pr-8">{job.profile.name}</p>
                       <p className="text-[10px] text-slate-500 mt-1">{new Date(job.createdAt).toLocaleString()}</p>
                     </Link>
-                    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <DeleteButton 
-                        action={deleteJob}
-                        id={job.id}
-                        confirmMessage="Delete this build job and its output file?"
-                        iconSize={3.5}
-                      />
-                    </div>
+                    {isUserAdmin && (
+                      <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <DeleteButton 
+                          action={deleteJob}
+                          id={job.id}
+                          confirmMessage="Delete this build job and its output file?"
+                          iconSize={3.5}
+                        />
+                      </div>
+                    )}
                   </div>
                 ))
               )}

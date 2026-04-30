@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { requireAuth } from '@/lib/auth-utils'
 import { ArrowLeft, Save, Info } from 'lucide-react'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
@@ -10,6 +11,7 @@ export default async function EditProfile({
 }: { 
   params: Promise<{ id: string }> 
 }) {
+  await requireAuth()
   const { id } = await params
   
   const profile = await prisma.profile.findUnique({
@@ -30,6 +32,7 @@ export default async function EditProfile({
 
   async function updateProfile(formData: FormData) {
     'use server'
+    await requireAuth()
     
     const name = formData.get('name') as string
     const baseImageId = formData.get('baseImageId') as string

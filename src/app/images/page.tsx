@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { isAdmin, requireAdmin } from '@/lib/auth-utils'
 import { Plus, Disc, ArrowLeft, CheckCircle, Clock, XCircle, Globe, Server } from 'lucide-react'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
@@ -12,6 +13,7 @@ export default async function ImagesList({
   searchParams: Promise<{ type?: string }> 
 }) {
   const { type = 'ISO' } = await searchParams
+  const isUserAdmin = await isAdmin()
   
   const images = await prisma.baseImage.findMany({
     where: { imageType: type },
@@ -20,6 +22,7 @@ export default async function ImagesList({
 
   async function deleteImage(formData: FormData) {
     'use server'
+    await requireAdmin()
     const id = formData.get('id') as string
     const image = await prisma.baseImage.findUnique({ where: { id } })
     
@@ -53,13 +56,15 @@ export default async function ImagesList({
             </Link>
             <h1 className="text-xl font-bold text-slate-900">Base Image Manager</h1>
           </div>
-          <Link 
-            href={`/images/new?type=${type}`} 
-            className="inline-flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-indigo-700 transition-colors shadow-sm"
-          >
-            <Plus className="w-4 h-4" />
-            Add {type === 'ISO' ? 'ISO' : 'Cloud Image'}
-          </Link>
+          {isUserAdmin && (
+            <Link 
+              href={`/images/new?type=${type}`} 
+              className="inline-flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-indigo-700 transition-colors shadow-sm"
+            >
+              <Plus className="w-4 h-4" />
+              Add {type === 'ISO' ? 'ISO' : 'Cloud Image'}
+            </Link>
+          )}
         </div>
       </header>
 
@@ -159,12 +164,14 @@ export default async function ImagesList({
                       )}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <DeleteButton 
-                        action={deleteImage}
-                        id={img.id}
-                        confirmMessage="Are you sure? Deleting this image will also delete all associated profiles and build jobs."
-                        iconSize={4}
-                      />
+                      {isUserAdmin && (
+                        <DeleteButton 
+                          action={deleteImage}
+                          id={img.id}
+                          confirmMessage="Are you sure? Deleting this image will also delete all associated profiles and build jobs."
+                          iconSize={4}
+                        />
+                      )}
                     </td>
                   </tr>
                 ))
