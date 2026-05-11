@@ -2,6 +2,7 @@ import { signIn } from "@/auth"
 import { Rocket, Lock, User, AlertCircle } from "lucide-react"
 import { getSettings } from "@/lib/settings"
 import { AuthError } from "next-auth"
+import Image from "next/image"
 
 export default async function LoginPage({
   searchParams,
@@ -30,7 +31,15 @@ export default async function LoginPage({
         <div className="text-center space-y-2">
           <div className="flex justify-center">
             {settings.companyLogo ? (
-              <img src={settings.companyLogo} alt="Logo" className="w-16 h-16 object-contain" />
+              <div className="relative w-16 h-16">
+                <Image 
+                  src={settings.companyLogo} 
+                  alt="Logo" 
+                  fill 
+                  className="object-contain" 
+                  priority
+                />
+              </div>
             ) : (
               <Rocket className="w-12 h-12 text-indigo-600" />
             )}

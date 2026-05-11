@@ -5,22 +5,26 @@ import { auth } from '@/auth'
 /**
  * Basic authentication helper for API routes.
  * Checks for either a valid session OR an 'x-api-key' header.
- * Note: Actual API Key support should be added to the User model eventually.
- * For now, we prioritize session-based CLI access or simple header check.
  */
-export async function validateApiRequest() {
+export async function validateApiRequest(request?: Request) {
   const session = await auth()
   if (session?.user) return session.user
 
-  // Future: Add API key check here
-  // const apiKey = request.headers.get('x-api-key')
-  // if (apiKey) { ... }
+  if (request) {
+    const apiKey = request.headers.get('x-api-key')
+    if (apiKey) {
+      const user = await prisma.user.findUnique({
+        where: { apiKey }
+      })
+      if (user) return user
+    }
+  }
 
   return null
 }
 
-export async function GET() {
-  const user = await validateApiRequest()
+export async function GET(request: Request) {
+  const user = await validateApiRequest(request)
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }

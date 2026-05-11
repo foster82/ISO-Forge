@@ -101,7 +101,7 @@ async function handleBootTestJob(jobId: string, payload: Omit<TestOptions, 'onLo
       where: { id: jobId },
       data: { 
         bootTestStatus: 'RUNNING',
-        bootTestLog: 'Initialising QEMU...\n'
+        bootTestLog: `Initialising QEMU (${payload.arch || 'amd64'})...\n`
       }
     })
 
@@ -132,3 +132,4 @@ async function handleBootTestJob(jobId: string, payload: Omit<TestOptions, 'onLo
     throw error
   }
 }
+

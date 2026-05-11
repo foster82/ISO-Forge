@@ -11,6 +11,7 @@ model BaseImage {
   id              String     @id @default(cuid())
   name            String     // e.g. Ubuntu 24.04 Server
   version         String
+  arch            String     @default("amd64") // amd64, arm64
   filename        String
   path            String     // Path to the downloaded file
   imageType       String     @default("ISO") // ISO, CLOUD_IMAGE
@@ -21,6 +22,16 @@ model BaseImage {
   profiles        Profile[]
 }
 
+model Recipe {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  packages    String   // JSON array of strings
+  runcmd      String   @default("[]") // JSON array of strings
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
 model Profile {
   id           String     @id @default(cuid())
   name         String
@@ -29,6 +40,9 @@ model Profile {
   passwordHash String     // hashed password for autoinstall
   sshKey       String?    // Public SSH key
   packages     String     // JSON array of strings
+  timezone     String     @default("UTC")
+  locale       String     @default("en_US.UTF-8")
+  runcmd       String     @default("[]") // JSON array of strings
   configYaml   String?    // Additional cloud-init overrides
   ipAddress    String?    // Optional static IP (e.g. 192.168.1.10/24)
   gateway      String?    // Optional gateway
@@ -65,17 +79,32 @@ model GlobalSettings {
   ldapBindDn   String?
   ldapBindPw   String?
   ldapFilter   String?  @default("(uid={{username}})")
+  ldapAdminGroup String? // LDAP group for ADMIN role
+  ldapUserGroup  String? // LDAP group for USER role (optional, can fallback to anyone)
 
   updatedAt    DateTime @updatedAt
+}
+
+model OpenStackProvider {
+  id          String   @id @default(cuid())
+  name        String   // e.g. "Production Cloud", "Dev Lab"
+  authUrl     String
+  region      String   @default("RegionOne")
+  domainName  String   @default("Default")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model User {
   id            String    @id @default(cuid())
   username      String    @unique
   name          String?
+  email         String?   @unique
   password      String?   // Hashed local password
   role          String    @default("USER") // ADMIN, USER
   authSource    String    @default("LOCAL") // LOCAL, LDAP
+  apiKey        String?   @unique   // Static API key for CLI/CI
+  groups        String    @default("[]") // JSON array of strings
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }

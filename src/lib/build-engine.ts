@@ -9,12 +9,16 @@ const execAsync = promisify(exec)
 export interface BuildOptions {
   baseIsoPath: string
   imageType: 'ISO' | 'CLOUD_IMAGE'
+  arch?: string // 'amd64' or 'arm64'
   outputPath: string
   hostname: string
   username: string
   passwordHash: string
   sshKey?: string
   packages: string[]
+  timezone?: string
+  locale?: string
+  runcmd?: string[]
   configYaml?: string
   ipAddress?: string
   gateway?: string
@@ -202,18 +206,16 @@ terminal_output --append serial
     }
   }
 
-  private static generateUserData(options: BuildOptions): string {
-    const packagesStr = options.packages.length > 0 
-      ? `\n    packages:\n${options.packages.map(p => `      - ${p}`).join('\n')}`
-      : ''
+  static generateUserData(options: BuildOptions): string {
+    const isIso = options.imageType === 'ISO'
     
-    const sshKeyStr = options.sshKey 
-      ? `\n    ssh_authorized_keys:\n      - ${options.sshKey}`
-      : ''
-
-    const customYamlStr = options.configYaml 
-      ? `\n# Custom Configuration Overrides\n${options.configYaml}`
-      : ''
+    const timezone = options.timezone || 'UTC'
+    const locale = options.locale || 'en_US.UTF-8'
+    
+    // Common components
+    const packagesArr = options.packages.length > 0 ? options.packages : []
+    const runcmdArr = options.runcmd && options.runcmd.length > 0 ? options.runcmd : []
+    const sshKeys = options.sshKey ? [options.sshKey] : []
 
     let networkStr = ''
     if (options.ipAddress) {
@@ -237,13 +239,33 @@ terminal_output --append serial
             - ${options.ipAddress}${gatewayStr}${dnsStr}`
     }
 
-    return `#cloud-config
+    if (isIso) {
+      // Ubuntu Autoinstall Format (for ISOs)
+      const packagesStr = packagesArr.length > 0 
+        ? `\n    packages:\n${packagesArr.map(p => `      - ${p}`).join('\n')}`
+        : ''
+      
+      const sshKeyStr = sshKeys.length > 0 
+        ? `\n    ssh_authorized_keys:\n${sshKeys.map(k => `      - ${k}`).join('\n')}`
+        : ''
+
+      const runcmdStr = runcmdArr.length > 0
+        ? `\n    runcmd:\n${runcmdArr.map(cmd => `      - ${cmd}`).join('\n')}`
+        : ''
+
+      const customYamlStr = options.configYaml 
+        ? `\n# Custom Configuration Overrides\n${options.configYaml}`
+        : ''
+
+      return `#cloud-config
 autoinstall:
   version: 1
   identity:
     hostname: ${options.hostname}
     password: "${options.passwordHash}"
     username: ${options.username}
+  locale: ${locale}
+  timezone: ${timezone}
   ssh:
     install-server: true
     allow-pw: true
@@ -256,7 +278,43 @@ autoinstall:
     layout:
       name: direct
   reboot: true${networkStr}
-${packagesStr}${customYamlStr}
+${packagesStr}${runcmdStr}${customYamlStr}
 `
+    } else {
+      // Standard cloud-config Format (for Cloud Images)
+      const packagesStr = packagesArr.length > 0 
+        ? `\npackages:\n${packagesArr.map(p => `  - ${p}`).join('\n')}`
+        : ''
+      
+      const sshKeyStr = sshKeys.length > 0 
+        ? `\n    ssh_authorized_keys:\n${sshKeys.map(k => `      - ${k}`).join('\n')}`
+        : ''
+
+      const runcmdStr = runcmdArr.length > 0
+        ? `\nruncmd:\n${runcmdArr.map(cmd => `  - ${cmd}`).join('\n')}`
+        : ''
+
+      const customYamlStr = options.configYaml 
+        ? `\n# Custom Configuration Overrides\n${options.configYaml}`
+        : ''
+
+      return `#cloud-config
+hostname: ${options.hostname}
+manage_etc_hosts: true
+users:
+  - name: ${options.username}
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    groups: [sudo]
+    shell: /bin/bash
+    lock_passwd: false
+    passwd: "${options.passwordHash}"${sshKeyStr}
+
+locale: ${locale}
+timezone: ${timezone}
+
+ssh_pwauth: true
+${packagesStr}${runcmdStr}${networkStr}${customYamlStr}
+`
+    }
   }
 }

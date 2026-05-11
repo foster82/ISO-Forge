@@ -6,6 +6,7 @@ import { notFound } from 'next/navigation'
 import YamlEditor from '@/components/YamlEditor'
 
 import { updateProfile } from '@/lib/actions/profiles'
+import RecipeSelector from '@/components/RecipeSelector'
 
 export default async function EditProfile({ 
   params 
@@ -28,8 +29,15 @@ export default async function EditProfile({
     where: { imageType: type, status: 'READY' }
   })
 
+  const recipes = await prisma.recipe.findMany({
+    orderBy: { name: 'asc' }
+  })
+
   const packagesList = JSON.parse(profile.packages) as string[]
   const packagesString = packagesList.join(', ')
+
+  const runcmdList = JSON.parse(profile.runcmd) as string[]
+  const runcmdString = runcmdList.join('\n')
 
   const updateProfileWithId = updateProfile.bind(null, id)
 
@@ -49,6 +57,8 @@ export default async function EditProfile({
       </header>
 
       <main className="flex-1 max-w-4xl mx-auto w-full p-6">
+        <RecipeSelector recipes={recipes} />
+        
         <form action={updateProfileWithId} className="space-y-8">
           {/* Basic Info */}
           <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
@@ -147,6 +157,32 @@ export default async function EditProfile({
             </div>
             </section>
 
+            {/* Regional Settings */}
+            <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+              <h2 className="text-lg font-semibold text-slate-900 border-b pb-2">Regional Settings</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-700">Timezone</label>
+                  <input 
+                    name="timezone" 
+                    type="text" 
+                    defaultValue={profile.timezone}
+                    placeholder="e.g. Europe/London"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-700">Locale</label>
+                  <input 
+                    name="locale" 
+                    type="text" 
+                    defaultValue={profile.locale}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                  />
+                </div>
+              </div>
+            </section>
+
             {/* Networking */}
             <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
             <h2 className="text-lg font-semibold text-slate-900 border-b pb-2">Networking (Optional Static IP)</h2>
@@ -196,6 +232,22 @@ export default async function EditProfile({
                 placeholder="nginx, git, docker.io, curl"
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
               />
+            </div>
+          </section>
+
+          {/* Post-Install Scripts */}
+          <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+            <h2 className="text-lg font-semibold text-slate-900 border-b pb-2">Post-Install Scripts (runcmd)</h2>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-700">Custom Commands</label>
+              <textarea 
+                name="runcmd" 
+                rows={4}
+                defaultValue={runcmdString}
+                placeholder="echo 'Hello World' > /tmp/hello.txt&#10;systemctl enable nginx"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-xs focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+              ></textarea>
+              <p className="text-xs text-slate-500">Commands to run on first boot. Enter one command per line.</p>
             </div>
           </section>
 

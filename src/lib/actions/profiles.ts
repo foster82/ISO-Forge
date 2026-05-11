@@ -20,6 +20,10 @@ export async function createProfile(formData: FormData) {
   const packagesRaw = formData.get('packages') as string
   const configYaml = formData.get('configYaml') as string
   
+  const timezone = formData.get('timezone') as string
+  const locale = formData.get('locale') as string
+  const runcmdRaw = formData.get('runcmd') as string
+
   const ipAddress = formData.get('ipAddress') as string
   const gateway = formData.get('gateway') as string
   const dnsServers = formData.get('dnsServers') as string
@@ -42,6 +46,11 @@ export async function createProfile(formData: FormData) {
     .map(p => p.trim())
     .filter(p => p.length > 0)
 
+  // Parse runcmd into JSON array
+  const runcmd = runcmdRaw
+    ? runcmdRaw.split('\n').map(c => c.trim()).filter(c => c.length > 0)
+    : []
+
   await prisma.profile.create({
     data: {
       name,
@@ -51,6 +60,9 @@ export async function createProfile(formData: FormData) {
       passwordHash,
       sshKey,
       packages: JSON.stringify(packages),
+      timezone: timezone || 'UTC',
+      locale: locale || 'en_US.UTF-8',
+      runcmd: JSON.stringify(runcmd),
       configYaml: configYaml || null,
       ipAddress: ipAddress || null,
       gateway: gateway || null,
@@ -71,6 +83,10 @@ export async function updateProfile(id: string, formData: FormData) {
   const sshKey = formData.get('sshKey') as string
   const packagesRaw = formData.get('packages') as string
   const configYaml = formData.get('configYaml') as string
+
+  const timezone = formData.get('timezone') as string
+  const locale = formData.get('locale') as string
+  const runcmdRaw = formData.get('runcmd') as string
   
   const ipAddress = formData.get('ipAddress') as string
   const gateway = formData.get('gateway') as string
@@ -95,6 +111,10 @@ export async function updateProfile(id: string, formData: FormData) {
     .map(p => p.trim())
     .filter(p => p.length > 0)
 
+  const runcmd = runcmdRaw
+    ? runcmdRaw.split('\n').map(c => c.trim()).filter(c => c.length > 0)
+    : []
+
   await prisma.profile.update({
     where: { id },
     data: {
@@ -105,6 +125,9 @@ export async function updateProfile(id: string, formData: FormData) {
       passwordHash,
       sshKey,
       packages: JSON.stringify(packages),
+      timezone: timezone || 'UTC',
+      locale: locale || 'en_US.UTF-8',
+      runcmd: JSON.stringify(runcmd),
       configYaml: configYaml || null,
       ipAddress: ipAddress || null,
       gateway: gateway || null,
@@ -182,10 +205,14 @@ export async function startBuild(id: string) {
       passwordHash: profile.passwordHash,
       sshKey: profile.sshKey || undefined,
       packages: JSON.parse(profile.packages),
+      timezone: profile.timezone,
+      locale: profile.locale,
+      runcmd: JSON.parse(profile.runcmd),
       configYaml: profile.configYaml || undefined,
       ipAddress: profile.ipAddress || undefined,
       gateway: profile.gateway || undefined,
       dnsServers: profile.dnsServers ? profile.dnsServers.split(',').map(d => d.trim()) : undefined,
+      arch: profile.baseImage.arch
     }
   })
 

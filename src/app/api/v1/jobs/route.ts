@@ -2,8 +2,8 @@ import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { validateApiRequest } from '../images/route'
 
-export async function GET() {
-  const user = await validateApiRequest()
+export async function GET(request: Request) {
+  const user = await validateApiRequest(request)
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }

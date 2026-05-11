@@ -73,6 +73,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           })
 
           if (ldapUser) {
+            console.log(`[AUTH DEBUG] LDAP login successful for ${username}. Groups: ${ldapUser.groups.join(', ')}`)
+            
+            // Determine role based on groups
+            let role = 'USER'
+            if (settings.ldapAdminGroup && ldapUser.groups.includes(settings.ldapAdminGroup)) {
+              role = 'ADMIN'
+            } else if (settings.ldapUserGroup && !ldapUser.groups.includes(settings.ldapUserGroup)) {
+              // If a user group is specified and they AREN'T in it, deny login
+              console.log(`[AUTH DEBUG] User ${username} denied: Not in required user group ${settings.ldapUserGroup}`)
+              return null
+            }
+
             // Check if user exists in local DB to get roles/metadata
             let localUser = await prisma.user.findUnique({
               where: { username }
@@ -84,8 +96,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 data: {
                   username,
                   name: ldapUser.name,
+                  email: ldapUser.email,
                   authSource: 'LDAP',
-                  role: 'USER' // Default role
+                  role: role
+                }
+              })
+            } else {
+              // Update existing user with latest LDAP info (role/name/email)
+              localUser = await prisma.user.update({
+                where: { username },
+                data: {
+                  name: ldapUser.name,
+                  email: ldapUser.email,
+                  role: role
                 }
               })
             }
@@ -94,6 +117,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               id: localUser.id,
               name: localUser.name,
               username: localUser.username,
+              email: localUser.email,
               role: localUser.role,
               authSource: 'LDAP'
             }

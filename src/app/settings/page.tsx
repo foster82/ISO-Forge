@@ -1,13 +1,30 @@
 import { getSettings } from '@/lib/settings'
 import { requireAdmin } from '@/lib/auth-utils'
-import { ArrowLeft, Save, Building, Image as ImageIcon, Shield, Network, Trash2, Wrench } from 'lucide-react'
+import { ArrowLeft, Save, Building, Image as ImageIcon, Shield, Network, Trash2, Wrench, Database, Download, Plus, Users, Edit2, Globe } from 'lucide-react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { updateSettings } from '@/lib/actions/settings'
 import { cleanupJobs } from '@/lib/actions/jobs'
+import { createOpenStackProvider, deleteOpenStackProvider, getOpenStackProviders } from '@/lib/actions/openstack-providers'
+import { BackupEngine } from '@/lib/backup-engine'
+import { triggerBackup, removeBackup } from '@/lib/actions/backups'
+import DeleteButton from '@/components/DeleteButton'
+import LdapTester from '@/components/LdapTester'
+import OpenStackProviderItem from '@/components/OpenStackProviderItem'
 
 export default async function SettingsPage() {
   await requireAdmin()
   const settings = await getSettings()
+  const backups = await BackupEngine.listBackups()
+  const providers = await getOpenStackProviders()
+
+  const formatSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes'
+    const k = 1024
+    const sizes = ['Bytes', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-50">
@@ -30,13 +47,13 @@ export default async function SettingsPage() {
               <div className="p-8 space-y-6">
                 <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
                   <Building className="w-5 h-5 text-indigo-600" />
-                  Company Branding
+                  App Branding
                 </h2>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label htmlFor="companyName" className="text-sm font-medium text-slate-700">
-                      Company Name
+                      Application Name
                     </label>
                     <input
                       type="text"
@@ -63,9 +80,9 @@ export default async function SettingsPage() {
                         className="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none h-24 font-mono text-xs"
                       />
                     </div>
-                    <div className="w-24 h-24 border border-slate-200 rounded-lg flex items-center justify-center bg-slate-50 overflow-hidden">
+                    <div className="w-24 h-24 border border-slate-200 rounded-lg flex items-center justify-center bg-slate-50 overflow-hidden relative">
                       {settings.companyLogo ? (
-                        <img src={settings.companyLogo} alt="Logo Preview" className="max-w-full max-h-full object-contain" />
+                        <Image src={settings.companyLogo} alt="Logo Preview" fill className="object-contain" />
                       ) : (
                         <div className="flex flex-col items-center text-slate-400">
                           <ImageIcon className="w-8 h-8 mb-1" />
@@ -115,10 +132,14 @@ export default async function SettingsPage() {
 
                 {/* LDAP Settings - Only show or highlight if LDAP/BOTH is selected */}
                 <div className="space-y-6 pt-6 border-t border-slate-100">
-                  <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                    <Network className="w-4 h-4 text-slate-400" />
-                    LDAP Configuration
-                  </h3>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                      <Network className="w-4 h-4 text-slate-400" />
+                      LDAP Configuration
+                    </h3>
+                  </div>
+
+                  <LdapTester />
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
@@ -172,6 +193,38 @@ export default async function SettingsPage() {
                       <p className="text-[10px] text-slate-500">Use {"{{username}}"} as a placeholder for the login input.</p>
                     </div>
                   </div>
+
+                  <div className="space-y-4 pt-6 border-t border-slate-100">
+                    <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                      <Users className="w-4 h-4 text-slate-400" />
+                      Group-Based Role Mapping (RBAC)
+                    </h3>
+                    <p className="text-[10px] text-slate-500">Map LDAP groups to application roles. Role mapping happens automatically upon login.</p>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-slate-700">Admin Group (Full Access)</label>
+                        <input
+                          name="ldapAdminGroup"
+                          type="text"
+                          defaultValue={settings.ldapAdminGroup || ""}
+                          placeholder="e.g. ISO-Forge-Admins"
+                          className="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-slate-700">User Group (Restricted)</label>
+                        <input
+                          name="ldapUserGroup"
+                          type="text"
+                          defaultValue={settings.ldapUserGroup || ""}
+                          placeholder="e.g. IT-Staff"
+                          className="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                        />
+                        <p className="text-[10px] text-slate-500 italic">If provided, only members of this group can log in.</p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -186,6 +239,159 @@ export default async function SettingsPage() {
               </div>
             </div>
           </form>
+
+          {/* Configuration Recipes Section */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-8 space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                    <Wrench className="w-5 h-5 text-indigo-600" />
+                    Configuration Recipes
+                  </h2>
+                  <p className="text-sm text-slate-500 mt-1">Manage reusable bundles of packages and scripts to apply to profiles.</p>
+                </div>
+                <Link
+                  href="/settings/recipes"
+                  className="inline-flex items-center gap-2 bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-bold hover:bg-slate-50 transition-all shadow-sm"
+                >
+                  <Edit2 className="w-4 h-4" />
+                  Manage Recipes
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          {/* Database Backups Section */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-8 space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                  <Database className="w-5 h-5 text-indigo-600" />
+                  Database Backups
+                </h2>
+                <form action={async () => { 'use server'; await triggerBackup(); }}>
+                  <button
+                    type="submit"
+                    className="inline-flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 transition-all shadow-sm"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Create New Backup
+                  </button>
+                </form>
+              </div>
+
+              <div className="border border-slate-200 rounded-xl overflow-hidden">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-medium">
+                    <tr>
+                      <th className="px-6 py-3">Filename</th>
+                      <th className="px-6 py-3">Date Created</th>
+                      <th className="px-6 py-3">Size</th>
+                      <th className="px-6 py-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {backups.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="px-6 py-8 text-center text-slate-500 italic">
+                          No backups found.
+                        </td>
+                      </tr>
+                    ) : (
+                      backups.map((backup) => (
+                        <tr key={backup.filename} className="hover:bg-slate-50 transition-colors group">
+                          <td className="px-6 py-4 font-mono text-xs text-slate-700">{backup.filename}</td>
+                          <td className="px-6 py-4 text-slate-600">{backup.createdAt.toLocaleString()}</td>
+                          <td className="px-6 py-4 text-slate-600">{formatSize(backup.size)}</td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex justify-end items-center gap-2">
+                              <a
+                                href={`/api/backups/download/${backup.filename}`}
+                                className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                                title="Download Backup"
+                              >
+                                <Download className="w-4 h-4" />
+                              </a>
+                              <DeleteButton
+                                action={removeBackup.bind(null, backup.filename)}
+                                confirmMessage={`Are you sure you want to delete backup ${backup.filename}?`}
+                                iconSize={4}
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          {/* Cloud Provider Integration (OpenStack) */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-8 space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                    <Globe className="w-5 h-5 text-indigo-600" />
+                    OpenStack Cloud Providers
+                  </h2>
+                  <p className="text-sm text-slate-500 mt-1">Register multiple OpenStack instances. Users will provide their own credentials when pushing images.</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pt-4">
+                {/* Add Provider Form */}
+                <div className="lg:col-span-1 p-6 bg-slate-50 rounded-xl border border-slate-200">
+                  <h3 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
+                    <Plus className="w-4 h-4 text-indigo-600" />
+                    Add Cloud Endpoint
+                  </h3>
+                  <form action={createOpenStackProvider} className="space-y-4">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-500 uppercase">Provider Name</label>
+                      <input name="name" type="text" required placeholder="e.g. Production Cloud" className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-500 uppercase">Auth URL (Keystone)</label>
+                      <input name="authUrl" type="url" required placeholder="https://...:5000/v3" className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-mono" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-500 uppercase">Region</label>
+                        <input name="region" type="text" defaultValue="RegionOne" className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-500 uppercase">Domain</label>
+                        <input name="domainName" type="text" defaultValue="Default" className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm" />
+                      </div>
+                    </div>
+                    <button type="submit" className="w-full py-2 bg-indigo-600 text-white rounded-lg font-bold text-xs hover:bg-indigo-700 transition-all">
+                      Register Provider
+                    </button>
+                  </form>
+                </div>
+
+                {/* Provider List */}
+                <div className="lg:col-span-2 space-y-4">
+                  {providers.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center p-8 text-center border-2 border-dashed border-slate-200 rounded-xl">
+                      <Globe className="w-8 h-8 text-slate-200 mb-2" />
+                      <p className="text-sm text-slate-400">No OpenStack providers registered yet.</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-4">
+                      {providers.map(provider => (
+                        <OpenStackProviderItem key={provider.id} provider={provider} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
 
           {/* System Maintenance */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">

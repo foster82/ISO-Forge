@@ -87,21 +87,23 @@ export async function runBootTest(id: string, _formData?: FormData) {
       payload: {
         imagePath: job.outputPath,
         imageType: job.profile.baseImage.imageType as 'ISO' | 'CLOUD_IMAGE',
+        arch: job.profile.baseImage.arch
       }
     })
 
     console.log(`[BOOT-TEST] Successfully queued job: ${id}`)
     revalidatePath(`/jobs/${id}`)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(`[BOOT-TEST] Critical error in runBootTest for job ${id}:`, error)
     // Try to update DB with the error if possible
     try {
       const currentJob = await prisma.buildJob.findUnique({ where: { id } })
+      const errorMessage = error instanceof Error ? error.message : String(error)
       await prisma.buildJob.update({
         where: { id },
         data: { 
           bootTestStatus: 'FAILED',
-          bootTestLog: (currentJob?.bootTestLog || '') + `\n[CRITICAL ERROR] ${error.message || String(error)}`
+          bootTestLog: (currentJob?.bootTestLog || '') + `\n[CRITICAL ERROR] ${errorMessage}`
         }
       })
       revalidatePath(`/jobs/${id}`)

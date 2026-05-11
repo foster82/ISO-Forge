@@ -4,7 +4,7 @@ import React from 'react'
 import { Trash2 } from 'lucide-react'
 
 interface DeleteButtonProps {
-  action: (formData: FormData) => Promise<void>
+  action: (formData: FormData) => void | Promise<void> | Promise<any>
   confirmMessage: string
   id?: string
   className?: string

@@ -6,6 +6,7 @@ import YamlEditor from '@/components/YamlEditor'
 import { clsx } from 'clsx'
 
 import { createProfile } from '@/lib/actions/profiles'
+import RecipeSelector from '@/components/RecipeSelector'
 
 export default async function NewProfile({ 
   searchParams 
@@ -17,6 +18,10 @@ export default async function NewProfile({
   
   const baseImages = await prisma.baseImage.findMany({
     where: { imageType: type, status: 'READY' }
+  })
+
+  const recipes = await prisma.recipe.findMany({
+    orderBy: { name: 'asc' }
   })
 
   return (
@@ -60,6 +65,8 @@ export default async function NewProfile({
             Cloud Profile
           </Link>
         </div>
+
+        <RecipeSelector recipes={recipes} />
 
         <form action={createProfile} className="space-y-8">
           {/* Basic Info */}
@@ -164,6 +171,32 @@ export default async function NewProfile({
             </div>
             </section>
 
+            {/* Regional Settings */}
+            <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+              <h2 className="text-lg font-semibold text-slate-900 border-b pb-2">Regional Settings</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-700">Timezone</label>
+                  <input 
+                    name="timezone" 
+                    type="text" 
+                    defaultValue="UTC"
+                    placeholder="e.g. Europe/London"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-700">Locale</label>
+                  <input 
+                    name="locale" 
+                    type="text" 
+                    defaultValue="en_US.UTF-8"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                  />
+                </div>
+              </div>
+            </section>
+
             {/* Networking */}
             <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
             <h2 className="text-lg font-semibold text-slate-900 border-b pb-2">Networking (Optional Static IP)</h2>
@@ -211,6 +244,21 @@ export default async function NewProfile({
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
               />
               <p className="text-xs text-slate-500">Enter package names separated by commas.</p>
+            </div>
+          </section>
+
+          {/* Post-Install Scripts */}
+          <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+            <h2 className="text-lg font-semibold text-slate-900 border-b pb-2">Post-Install Scripts (runcmd)</h2>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-700">Custom Commands</label>
+              <textarea 
+                name="runcmd" 
+                rows={4}
+                placeholder="echo 'Hello World' > /tmp/hello.txt&#10;systemctl enable nginx"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-xs focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+              ></textarea>
+              <p className="text-xs text-slate-500">Commands to run on first boot. Enter one command per line.</p>
             </div>
           </section>
 

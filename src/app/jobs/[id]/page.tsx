@@ -7,7 +7,9 @@ import DeleteButton from '@/components/DeleteButton'
 import AutoRefresh from '@/components/AutoRefresh'
 import LogViewer from '@/components/LogViewer'
 import { deleteJob, runBootTest } from '@/lib/actions/jobs'
+import { getOpenStackProviders } from '@/lib/actions/openstack-providers'
 import TestBootButton from '@/components/TestBootButton'
+import OpenStackPushButton from '@/components/OpenStackPushButton'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,6 +24,8 @@ export default async function JobDetails({ params }: { params: Promise<{ id: str
   })
 
   if (!job) notFound()
+
+  const providers = await getOpenStackProviders()
 
   const isJobActive = 
     job.status === 'BUILDING' || 
@@ -60,13 +64,16 @@ export default async function JobDetails({ params }: { params: Promise<{ id: str
               </form>
             )}
             {job.status === 'COMPLETED' && (
-              <a 
-                href={`/api/download/${job.id}`}
-                className="inline-flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-emerald-700 transition-colors shadow-sm"
-              >
-                <Download className="w-4 h-4" />
-                Download {job.profile.baseImage.imageType === 'ISO' ? 'ISO' : 'Image'}
-              </a>
+              <div className="flex items-center gap-3">
+                <OpenStackPushButton jobId={job.id} providers={providers} />
+                <a 
+                  href={`/api/download/${job.id}`}
+                  className="inline-flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-emerald-700 transition-colors shadow-sm"
+                >
+                  <Download className="w-4 h-4" />
+                  Download {job.profile.baseImage.imageType === 'ISO' ? 'ISO' : 'Image'}
+                </a>
+              </div>
             )}
           </div>
         </div>

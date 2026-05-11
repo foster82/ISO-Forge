@@ -13,6 +13,8 @@
 - `npm run build`: Build for production
 - `npm run start`: Start production server
 - `npm run lint`: Run ESLint
+- `npm run test`: Run Vitest in watch mode
+- `npm run test:run`: Run Vitest once (CI mode)
 
 ### Docker
 - `docker-compose up -d --build`: Build and start the containerized stack

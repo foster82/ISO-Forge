@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { isAdmin, requireAuth } from '@/lib/auth-utils'
-import { ArrowLeft, Play, Disc, Shield, Globe, Calendar, Edit2 } from 'lucide-react'
+import { ArrowLeft, Play, Disc, Shield, Globe, Calendar, Edit2, Clock, Languages, Terminal } from 'lucide-react'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import DeleteButton from '@/components/DeleteButton'
@@ -20,6 +20,7 @@ export default async function ProfileDetails({ params }: { params: Promise<{ id:
   if (!profile) notFound()
 
   const packages = JSON.parse(profile.packages) as string[]
+  const runcmd = JSON.parse(profile.runcmd || '[]') as string[]
 
   const startBuildWithId = startBuild.bind(null, id)
   const deleteProfileWithId = deleteProfile.bind(null, id)
@@ -112,6 +113,24 @@ export default async function ProfileDetails({ params }: { params: Promise<{ id:
                   <p className="text-slate-900">{new Date(profile.createdAt).toLocaleDateString()}</p>
                 </div>
               </div>
+              <div className="flex gap-4">
+                <div className="p-2 bg-slate-100 rounded-lg h-fit">
+                  <Clock className="w-5 h-5 text-slate-600" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase">Timezone</p>
+                  <p className="text-slate-900">{profile.timezone}</p>
+                </div>
+              </div>
+              <div className="flex gap-4">
+                <div className="p-2 bg-slate-100 rounded-lg h-fit">
+                  <Languages className="w-5 h-5 text-slate-600" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase">Locale</p>
+                  <p className="text-slate-900">{profile.locale}</p>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -160,6 +179,29 @@ export default async function ProfileDetails({ params }: { params: Promise<{ id:
                 </div>
               ) : (
                 <p className="text-slate-500 italic text-sm">No additional packages specified.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-200 bg-slate-50/50">
+              <h2 className="font-semibold text-slate-900 flex items-center gap-2">
+                <Terminal className="w-4 h-4 text-slate-400" />
+                Post-Install Scripts (runcmd)
+              </h2>
+            </div>
+            <div className="p-6">
+              {runcmd.length > 0 ? (
+                <div className="space-y-2">
+                  {runcmd.map((cmd, idx) => (
+                    <div key={idx} className="flex gap-3 font-mono text-xs bg-slate-900 text-emerald-400 p-2 rounded border border-slate-800">
+                      <span className="text-slate-600 select-none">{idx + 1}</span>
+                      <span className="break-all">{cmd}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-slate-500 italic text-sm">No post-install commands configured.</p>
               )}
             </div>
           </div>

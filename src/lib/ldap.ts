@@ -14,6 +14,64 @@ export interface LdapUser {
   username: string;
   email: string;
   authSource: 'LDAP';
+  groups: string[];
+}
+
+export async function testLDAP(config: LdapConfig): Promise<{ success: boolean; message: string }> {
+  const client = ldap.createClient({ url: config.url });
+  
+  return new Promise((resolve) => {
+    client.bind(config.bindDn || '', config.bindPw || '', (err) => {
+      if (err) {
+        client.unbind();
+        return resolve({ success: false, message: `Bind failed: ${err.message}` });
+      }
+
+      // Try a basic search to verify permissions
+      client.search(config.baseDn, { filter: '(objectClass=*)', scope: 'base' }, (err, res) => {
+        if (err) {
+          client.unbind();
+          return resolve({ success: false, message: `Search failed: ${err.message}` });
+        }
+        
+        let found = false;
+        res.on('searchEntry', () => { found = true; });
+        res.on('end', () => {
+          client.unbind();
+          if (found) resolve({ success: true, message: 'Connection successful!' });
+          else resolve({ success: false, message: 'Connection established but Base DN search returned no results.' });
+        });
+        res.on('error', (err) => {
+          client.unbind();
+          resolve({ success: false, message: `Search error: ${err.message}` });
+        });
+      });
+    });
+  });
+}
+
+async function getLDAPGroups(client: ldap.Client, userDn: string, baseDn: string): Promise<string[]> {
+  return new Promise((resolve) => {
+    const groups: string[] = [];
+    const opts = {
+      filter: `(|(member=${userDn})(uniqueMember=${userDn}))`, // Support common group member attributes
+      scope: 'sub' as const,
+      attributes: ['cn', 'dn']
+    };
+
+    client.search(baseDn, opts, (err, res) => {
+      if (err) return resolve([]);
+
+      res.on('searchEntry', (entry) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const group = (entry as any).object as { cn?: string, dn: string };
+        groups.push(group.cn || group.dn);
+      });
+
+      res.on('end', () => resolve(groups));
+      res.on('error', () => resolve(groups));
+    });
+  });
 }
 
 export async function authenticateLDAP(username: string, password: string, config: LdapConfig): Promise<LdapUser | null> {
@@ -34,7 +92,7 @@ export async function authenticateLDAP(username: string, password: string, confi
         const opts = {
           filter: searchFilter,
           scope: 'sub' as const,
-          attributes: ['dn', 'cn', 'mail', 'displayName']
+          attributes: ['dn', 'cn', 'mail', 'displayName', 'memberOf']
         };
 
         client.search(config.baseDn, opts, (err, res) => {
@@ -44,18 +102,46 @@ export async function authenticateLDAP(username: string, password: string, confi
           }
 
           let found = false;
-          res.on('searchEntry', (entry) => {
+          res.on('searchEntry', async (entry) => {
             found = true;
-            // The object property exists in ldapjs@3 but is missing from @types/ldapjs
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const user = (entry as any).object as { dn: string, displayName?: string, cn?: string, mail?: string };
+            const user = (entry as any).object as { 
+              dn: string, 
+              displayName?: string, 
+              cn?: string, 
+              mail?: string,
+              memberOf?: string | string[] 
+            };
+            
+            // 1. Extract groups from memberOf attribute (common in AD)
+            const memberOfGroups: string[] = [];
+            if (user.memberOf) {
+              const rawGroups = Array.isArray(user.memberOf) ? user.memberOf : [user.memberOf];
+              rawGroups.forEach(groupDn => {
+                // Extract CN from DN (e.g. "CN=Admins,OU=Groups,DC=example,DC=com" -> "Admins")
+                const match = groupDn.match(/CN=([^,]+)/i);
+                if (match && match[1]) {
+                  memberOfGroups.push(match[1]);
+                } else {
+                  memberOfGroups.push(groupDn); // Fallback to full DN
+                }
+              });
+            }
+
+            // 2. Get user groups via search (common in OpenLDAP)
+            const searchedGroups = await getLDAPGroups(client, user.dn, config.baseDn);
+            
+            // 3. Merge and deduplicate
+            const allGroups = Array.from(new Set([...memberOfGroups, ...searchedGroups]));
+            
             client.unbind();
             resolve({
               id: user.dn,
               name: (user.displayName || user.cn || username) as string,
               username: username,
               email: (user.mail || '') as string,
-              authSource: 'LDAP'
+              authSource: 'LDAP',
+              groups: allGroups
             });
           });
 
@@ -89,19 +175,21 @@ export async function authenticateLDAP(username: string, password: string, confi
             return resolve(null);
           }
 
+          let entryFound = false;
           res.on('searchEntry', (entry) => {
+            entryFound = true;
             bindAndSearch(entry.objectName as string);
           });
 
           res.on('end', () => {
-            // If not found yet, bindAndSearch wasn't called
+            if (!entryFound) {
+              client.unbind();
+              resolve(null);
+            }
           });
         });
       });
     } else {
-      // Direct bind attempt (guessing the DN pattern if possible, or just using username)
-      // This varies wildly by LDAP server, often userDn is needed.
-      // For now, assume username is the DN or can be used directly for bind if it's UPN style
       bindAndSearch(username);
     }
   });

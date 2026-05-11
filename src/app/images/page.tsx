@@ -82,6 +82,7 @@ export default async function ImagesList({
             <thead>
               <tr className="text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200 bg-slate-50/50">
                 <th className="px-6 py-4">Image Name</th>
+                <th className="px-6 py-4">Arch</th>
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4">Filename</th>
                 <th className="px-6 py-4 text-right">Actions</th>
@@ -90,7 +91,7 @@ export default async function ImagesList({
             <tbody className="divide-y divide-slate-100">
               {images.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-6 py-12 text-center text-slate-500 italic">
+                  <td colSpan={5} className="px-6 py-12 text-center text-slate-500 italic">
                     No {type === 'ISO' ? 'ISOs' : 'Cloud Images'} found.
                   </td>
                 </tr>
@@ -120,6 +121,11 @@ export default async function ImagesList({
                           <p className="text-xs text-slate-500">v{img.version}</p>
                         </div>
                       </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-bold border border-slate-200">
+                        {img.arch}
+                      </span>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
