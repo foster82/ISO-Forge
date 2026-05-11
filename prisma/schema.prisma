@@ -35,6 +35,7 @@ model Recipe {
 model Profile {
   id           String     @id @default(cuid())
   name         String
+  version      String     @default("1.0.0") // SemVer for the profile
   hostname     String     @default("ubuntu-server")
   username     String     @default("ubuntu")
   passwordHash String     // hashed password for autoinstall
@@ -56,9 +57,11 @@ model Profile {
 
 model BuildJob {
   id             String    @id @default(cuid())
+  version        String?   // The version of the profile at build time
   status         String    @default("PENDING") // PENDING, BUILDING, COMPLETED, FAILED
   log            String    @default("")
   outputPath     String?
+  vncPort        Int?      // Dynamic VNC port for live debugging
   bootTestStatus String?   // PENDING, RUNNING, PASSED, FAILED
   bootTestLog    String?   @default("")
   profileId      String
@@ -71,6 +74,11 @@ model GlobalSettings {
   id           String   @id @default("default")
   companyName  String   @default("ISO Forge")
   companyLogo  String?  // Base64 or path to logo
+  
+  // Retention Policies
+  jobRetentionDays   Int    @default(30)
+  buildRetentionCount Int    @default(10) // Per profile
+  autoCleanupEnabled Boolean @default(true)
   
   // Auth Settings
   authType     String   @default("LOCAL") // LOCAL, LDAP, BOTH

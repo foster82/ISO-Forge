@@ -38,6 +38,10 @@ export async function updateSettings(formData: FormData) {
   const ldapFilter = formData.get('ldapFilter') as string
   const ldapAdminGroup = formData.get('ldapAdminGroup') as string
   const ldapUserGroup = formData.get('ldapUserGroup') as string
+  
+  const jobRetentionDays = parseInt(formData.get('jobRetentionDays') as string) || 30
+  const buildRetentionCount = parseInt(formData.get('buildRetentionCount') as string) || 10
+  const autoCleanupEnabled = formData.get('autoCleanupEnabled') === 'on'
 
   await prisma.globalSettings.update({
     where: { id: 'default' },
@@ -51,7 +55,10 @@ export async function updateSettings(formData: FormData) {
       ldapBindPw: ldapBindPw || null,
       ldapFilter: ldapFilter || "(uid={{username}})",
       ldapAdminGroup: ldapAdminGroup || null,
-      ldapUserGroup: ldapUserGroup || null
+      ldapUserGroup: ldapUserGroup || null,
+      jobRetentionDays,
+      buildRetentionCount,
+      autoCleanupEnabled
     }
   })
 

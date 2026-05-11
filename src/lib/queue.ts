@@ -4,6 +4,7 @@ import { BuildEngine } from './build-engine'
 import { QEMURunner } from './qemu-runner'
 import { prisma } from './prisma'
 import { logEvents } from './events'
+import fsSync from 'fs'
 
 const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379'
 const connection = new Redis(redisUrl, {
@@ -17,6 +18,11 @@ export const buildQueue = new Queue('build-queue', { connection })
 export const setupWorkers = () => {
   console.log(`Connecting to Redis at: ${redisUrl}`)
   
+  // Schedule repeatable cleanup job (every hour)
+  buildQueue.add('cleanup', { type: 'cleanup' }, {
+    repeat: { pattern: '0 * * * *' }
+  }).catch(e => console.error('Failed to schedule cleanup job:', e))
+  
   const worker = new Worker(
     'build-queue',
     async (job: Job) => {
@@ -27,6 +33,8 @@ export const setupWorkers = () => {
         await handleBuildJob(jobId, payload)
       } else if (type === 'boot-test') {
         await handleBootTestJob(jobId, payload)
+      } else if (type === 'cleanup') {
+        await handleCleanupJob()
       }
     },
     { 
@@ -55,6 +63,51 @@ export const setupWorkers = () => {
 
 import { BuildOptions } from './build-engine'
 import { TestOptions } from './qemu-runner'
+
+async function handleCleanupJob() {
+  console.log('[CLEANUP-WORKER] Running automated cleanup...')
+  const settings = await prisma.globalSettings.findUnique({ where: { id: 'default' } })
+  if (!settings || !settings.autoCleanupEnabled) {
+    console.log('[CLEANUP-WORKER] Auto-cleanup is disabled.')
+    return
+  }
+
+  // 1. Delete old jobs by age
+  const ageThreshold = new Date()
+  ageThreshold.setDate(ageThreshold.getDate() - settings.jobRetentionDays)
+  
+  const oldJobs = await prisma.buildJob.findMany({
+    where: { createdAt: { lt: ageThreshold } }
+  })
+  
+  console.log(`[CLEANUP-WORKER] Found ${oldJobs.length} jobs older than ${settings.jobRetentionDays} days.`)
+  for (const job of oldJobs) {
+    if (job.outputPath && fsSync.existsSync(job.outputPath)) {
+      try { fsSync.unlinkSync(job.outputPath) } catch (e) { console.error(e) }
+    }
+    await prisma.buildJob.delete({ where: { id: job.id } })
+  }
+
+  // 2. Enforce build count per profile
+  const profiles = await prisma.profile.findMany()
+  for (const profile of profiles) {
+    const builds = await prisma.buildJob.findMany({
+      where: { profileId: profile.id, status: 'COMPLETED' },
+      orderBy: { createdAt: 'desc' },
+      skip: settings.buildRetentionCount
+    })
+    
+    if (builds.length > 0) {
+      console.log(`[CLEANUP-WORKER] Profile ${profile.name}: Removing ${builds.length} builds exceeding limit of ${settings.buildRetentionCount}.`)
+      for (const job of builds) {
+        if (job.outputPath && fsSync.existsSync(job.outputPath)) {
+          try { fsSync.unlinkSync(job.outputPath) } catch (e) { console.error(e) }
+        }
+        await prisma.buildJob.delete({ where: { id: job.id } })
+      }
+    }
+  }
+}
 
 async function handleBuildJob(jobId: string, payload: Omit<BuildOptions, 'onLog'>) {
   try {
@@ -117,7 +170,10 @@ async function handleBootTestJob(jobId: string, payload: Omit<TestOptions, 'onLo
 
     await prisma.buildJob.update({
       where: { id: jobId },
-      data: { bootTestStatus: success ? 'PASSED' : 'FAILED' }
+      data: { 
+        bootTestStatus: success ? 'PASSED' : 'FAILED',
+        vncPort: null 
+      }
     })
   } catch (error: unknown) {
     const currentJob = await prisma.buildJob.findUnique({ where: { id: jobId } })

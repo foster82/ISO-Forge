@@ -71,15 +71,28 @@ export async function runBootTest(id: string, _formData?: FormData) {
     }
 
     console.log(`[BOOT-TEST] Updating database status to PENDING for job: ${id}`)
+    
+    // Find a free VNC display number (1-100)
+    const activeJobs = await prisma.buildJob.findMany({
+      where: { bootTestStatus: { in: ['PENDING', 'RUNNING'] }, vncPort: { not: null } },
+      select: { vncPort: true }
+    })
+    const usedPorts = activeJobs.map(j => j.vncPort as number)
+    let vncPort = 1
+    while (usedPorts.includes(vncPort)) {
+      vncPort++
+    }
+
     await prisma.buildJob.update({
-      where: { id },
+      where: { id: id },
       data: { 
         bootTestStatus: 'PENDING',
-        bootTestLog: 'Job queued...\n'
+        bootTestLog: 'Job queued...\n',
+        vncPort: vncPort
       }
     })
 
-    console.log(`[BOOT-TEST] Adding job to BullMQ: ${id}`)
+    console.log(`[BOOT-TEST] Adding job to BullMQ: ${id} with VNC Display :${vncPort}`)
     // Add to BullMQ
     await buildQueue.add('boot-test', {
       type: 'boot-test',
@@ -87,7 +100,8 @@ export async function runBootTest(id: string, _formData?: FormData) {
       payload: {
         imagePath: job.outputPath,
         imageType: job.profile.baseImage.imageType as 'ISO' | 'CLOUD_IMAGE',
-        arch: job.profile.baseImage.arch
+        arch: job.profile.baseImage.arch,
+        vncDisplay: vncPort
       }
     })
 

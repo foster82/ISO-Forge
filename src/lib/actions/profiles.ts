@@ -13,6 +13,7 @@ export async function createProfile(formData: FormData) {
   await requireAuth()
   
   const name = formData.get('name') as string
+  const version = formData.get('version') as string || '1.0.0'
   const baseImageId = formData.get('baseImageId') as string
   const hostname = formData.get('hostname') as string
   const username = formData.get('username') as string
@@ -54,6 +55,7 @@ export async function createProfile(formData: FormData) {
   await prisma.profile.create({
     data: {
       name,
+      version,
       baseImageId,
       hostname,
       username,
@@ -77,6 +79,7 @@ export async function updateProfile(id: string, formData: FormData) {
   await requireAuth()
   
   const name = formData.get('name') as string
+  const version = formData.get('version') as string
   const baseImageId = formData.get('baseImageId') as string
   const hostname = formData.get('hostname') as string
   const username = formData.get('username') as string
@@ -119,6 +122,7 @@ export async function updateProfile(id: string, formData: FormData) {
     where: { id },
     data: {
       name,
+      version,
       baseImageId,
       hostname,
       username,
@@ -172,8 +176,9 @@ export async function startBuild(id: string) {
   const job = await prisma.buildJob.create({
     data: {
       profileId: id,
+      version: profile.version,
       status: 'PENDING',
-      log: `Job queued for image type: ${profile.baseImage.imageType}...\n`
+      log: `Job queued for image type: ${profile.baseImage.imageType} (Version: ${profile.version})...\n`
     }
   })
 

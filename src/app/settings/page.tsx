@@ -95,6 +95,60 @@ export default async function SettingsPage() {
               </div>
             </div>
 
+            {/* Retention Policies Section */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="p-8 space-y-6">
+                <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                  <Database className="w-5 h-5 text-indigo-600" />
+                  Automated Maintenance & Retention
+                </h2>
+                <p className="text-sm text-slate-500">Configure how long build history and custom images are kept on the server.</p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-200">
+                      <div>
+                        <p className="text-sm font-bold text-slate-900">Enable Auto-Cleanup</p>
+                        <p className="text-xs text-slate-500">Automatically remove old builds once an hour.</p>
+                      </div>
+                      <input 
+                        type="checkbox" 
+                        name="autoCleanupEnabled" 
+                        defaultChecked={settings.autoCleanupEnabled}
+                        className="w-5 h-5 text-indigo-600 rounded focus:ring-indigo-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-6">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-slate-700">Job History Retention (Days)</label>
+                      <input
+                        name="jobRetentionDays"
+                        type="number"
+                        min="1"
+                        defaultValue={settings.jobRetentionDays}
+                        className="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                      />
+                      <p className="text-[10px] text-slate-500">Delete all build records and files older than this.</p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-slate-700">Max Builds Per Profile</label>
+                      <input
+                        name="buildRetentionCount"
+                        type="number"
+                        min="1"
+                        defaultValue={settings.buildRetentionCount}
+                        className="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                      />
+                      <p className="text-[10px] text-slate-500">Keep only the N most recent successful builds for each profile.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Authentication Section */}
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
               <div className="p-8 space-y-6">

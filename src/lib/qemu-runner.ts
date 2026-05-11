@@ -12,6 +12,7 @@ export interface TestOptions {
   arch?: string // 'amd64' or 'arm64'
   onLog: (message: string) => Promise<void>
   timeoutMs?: number
+  vncDisplay?: number // Display number for VNC (e.g. 1 means port 5901)
 }
 
 export class QEMURunner {
@@ -28,16 +29,21 @@ export class QEMURunner {
       const machineType = arch === 'arm64' ? 'virt' : 'q35'
 
       const args = [
-        '-nographic',
         '-m', '4096',
         '-smp', '2',
         '-machine', machineType,
         '-netdev', 'user,id=net0',
         '-device', 'virtio-net-pci,netdev=net0',
         '-monitor', 'none',
-        '-display', 'none',
         '-serial', 'stdio'
       ]
+
+      if (options.vncDisplay !== undefined) {
+        args.push('-vnc', `:${options.vncDisplay}`)
+        await options.onLog(`VNC Enabled on display :${options.vncDisplay} (Port ${5900 + options.vncDisplay})\n`)
+      } else {
+        args.push('-nographic', '-display', 'none')
+      }
 
       if (arch === 'arm64') {
         // arm64/virt needs highmem off sometimes for older kernels, but let's try default

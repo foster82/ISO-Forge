@@ -28,8 +28,9 @@ export async function POST(
   const job = await prisma.buildJob.create({
     data: {
       profileId: id,
+      version: profile.version,
       status: 'PENDING',
-      log: `Job queued via API for image type: ${profile.baseImage.imageType}...\n`
+      log: `Job queued via API for image type: ${profile.baseImage.imageType} (Version: ${profile.version})...\n`
     }
   })
 

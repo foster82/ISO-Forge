@@ -48,10 +48,24 @@ export default async function JobDetails({ params }: { params: Promise<{ id: str
             </Link>
             <div>
               <h1 className="text-xl font-bold text-slate-900">Build Job #{job.id.substring(0, 8)}</h1>
-              <p className="text-xs text-slate-500">Profile: {job.profile.name}</p>
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-slate-500">Profile: {job.profile.name}</p>
+                {job.version && <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-bold rounded">v{job.version}</span>}
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-3">
+            {job.status === 'COMPLETED' && (
+              <a 
+                href={`/api/metadata/${job.id}/user-data`}
+                target="_blank"
+                className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-3 py-1.5 rounded-lg border border-indigo-100 transition-colors flex items-center gap-1.5"
+                title="Metadata Service URL for cloud-init"
+              >
+                <ShieldCheck className="w-3.5 h-3.5" />
+                Metadata URL
+              </a>
+            )}
             {isUserAdmin && (
               <DeleteButton 
                 action={deleteJobWithId}
@@ -117,8 +131,22 @@ export default async function JobDetails({ params }: { params: Promise<{ id: str
                 <div>
                   <p className="text-[10px] font-bold text-slate-400 uppercase">QEMU Boot Test</p>
                   <h2 className="text-xl font-bold text-slate-900 capitalize">{job.bootTestStatus.toLowerCase()}</h2>
+                  {job.vncPort && (
+                    <p className="text-[10px] font-mono text-emerald-600 font-bold mt-0.5">
+                      VNC: {5900 + job.vncPort} (Display :{job.vncPort})
+                    </p>
+                  )}
                 </div>
               </div>
+              {job.bootTestStatus === 'RUNNING' && job.vncPort && (
+                <div className="flex flex-col items-end gap-1">
+                   <span className="flex h-2 w-2 relative">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
+                  <p className="text-[10px] text-slate-400">Live Viewer Active</p>
+                </div>
+              )}
               {job.bootTestStatus === 'FAILED' && (
                 <form action={runBootTestWithId}>
                   <button type="submit" className="text-xs font-semibold text-indigo-600 hover:text-indigo-800">Retry Test</button>

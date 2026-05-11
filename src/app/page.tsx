@@ -328,6 +328,7 @@ export default async function Dashboard() {
 interface ProfileWithBaseImage {
   id: string
   name: string
+  version: string
   hostname: string
   baseImage: {
     name: string
@@ -343,9 +344,12 @@ function ProfileCard({ profile }: { profile: ProfileWithBaseImage }) {
             <Settings className="w-5 h-5 text-slate-400 group-hover:text-indigo-600" />
           </div>
           <div>
-            <Link href={`/profiles/${profile.id}`} className="font-bold text-slate-900 hover:text-indigo-600 transition-colors line-clamp-1">
-              {profile.name}
-            </Link>
+            <div className="flex items-center gap-2">
+              <Link href={`/profiles/${profile.id}`} className="font-bold text-slate-900 hover:text-indigo-600 transition-colors line-clamp-1">
+                {profile.name}
+              </Link>
+              <span className="px-1.5 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-bold rounded">v{profile.version}</span>
+            </div>
             <p className="text-xs text-slate-500 truncate max-w-[150px]">{profile.hostname} • {profile.baseImage.name}</p>
           </div>
         </div>
