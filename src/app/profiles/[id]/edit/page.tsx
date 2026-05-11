@@ -1,8 +1,8 @@
 import { prisma } from '@/lib/prisma'
-import { requireAuth } from '@/lib/auth-utils'
+import { requireAuth, isAdmin } from '@/lib/auth-utils'
 import { ArrowLeft, Save, Info } from 'lucide-react'
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import YamlEditor from '@/components/YamlEditor'
 
 import { updateProfile } from '@/lib/actions/profiles'
@@ -13,8 +13,9 @@ export default async function EditProfile({
 }: { 
   params: Promise<{ id: string }> 
 }) {
-  await requireAuth()
+  const user = await requireAuth()
   const { id } = await params
+  const isUserAdmin = await isAdmin()
   
   const profile = await prisma.profile.findUnique({
     where: { id },
@@ -22,6 +23,18 @@ export default async function EditProfile({
   })
 
   if (!profile) notFound()
+
+  // LDAP Group Visibility Check
+  if (!isUserAdmin) {
+    const allowedGroups = JSON.parse(profile.allowedGroups || '[]') as string[]
+    if (allowedGroups.length > 0) {
+      const userGroups = user.groups || []
+      const hasAccess = allowedGroups.some(group => userGroups.includes(group))
+      if (!hasAccess) {
+        redirect('/')
+      }
+    }
+  }
 
   const type = profile.baseImage.imageType
   
@@ -38,6 +51,9 @@ export default async function EditProfile({
 
   const runcmdList = JSON.parse(profile.runcmd) as string[]
   const runcmdString = runcmdList.join('\n')
+
+  const allowedGroupsList = JSON.parse(profile.allowedGroups || '[]') as string[]
+  const allowedGroupsString = allowedGroupsList.join(', ')
 
   const updateProfileWithId = updateProfile.bind(null, id)
 
@@ -192,6 +208,33 @@ export default async function EditProfile({
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
                   />
                 </div>
+              </div>
+            </section>
+
+            {/* Sharing & Visibility */}
+            <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+              <div className="flex items-center gap-2 border-b pb-2">
+                <h2 className="text-lg font-semibold text-slate-900">Sharing & Visibility</h2>
+                <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 text-[10px] font-bold uppercase rounded tracking-wider">LDAP Integration</span>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
+                  Allowed LDAP Groups
+                  <div className="group relative">
+                    <Info className="w-4 h-4 text-slate-400 cursor-help" />
+                    <div className="absolute bottom-full mb-2 left-0 w-64 p-2 bg-slate-800 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                      Comma-separated list of LDAP groups. If empty, profile is visible to all users. Admins always see all profiles.
+                    </div>
+                  </div>
+                </label>
+                <input 
+                  name="allowedGroups" 
+                  type="text" 
+                  defaultValue={allowedGroupsString}
+                  placeholder="e.g. IT-Admins, Developers"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                />
+                <p className="text-xs text-slate-500 italic">Leave empty to share with everyone.</p>
               </div>
             </section>
 

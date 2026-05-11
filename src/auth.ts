@@ -11,12 +11,14 @@ declare module "next-auth" {
     role?: string
     username?: string
     authSource?: string
+    groups?: string[]
   }
   interface Session {
     user: {
       role?: string
       username?: string
       authSource?: string
+      groups?: string[]
     } & DefaultSession["user"]
   }
 }
@@ -56,7 +58,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 name: user.name,
                 username: user.username,
                 role: user.role,
-                authSource: 'LOCAL'
+                authSource: 'LOCAL',
+                groups: JSON.parse(user.groups || '[]')
               }
             }
           }
@@ -98,17 +101,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                   name: ldapUser.name,
                   email: ldapUser.email,
                   authSource: 'LDAP',
-                  role: role
+                  role: role,
+                  groups: JSON.stringify(ldapUser.groups)
                 }
               })
             } else {
-              // Update existing user with latest LDAP info (role/name/email)
+              // Update existing user with latest LDAP info (role/name/email/groups)
               localUser = await prisma.user.update({
                 where: { username },
                 data: {
                   name: ldapUser.name,
                   email: ldapUser.email,
-                  role: role
+                  role: role,
+                  groups: JSON.stringify(ldapUser.groups)
                 }
               })
             }
@@ -119,7 +124,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               username: localUser.username,
               email: localUser.email,
               role: localUser.role,
-              authSource: 'LDAP'
+              authSource: 'LDAP',
+              groups: ldapUser.groups
             }
           }
         }

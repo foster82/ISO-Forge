@@ -25,6 +25,18 @@ export async function POST(
     return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
   }
 
+  // LDAP Group Visibility Check
+  if (user.role !== 'ADMIN') {
+    const allowedGroups = JSON.parse(profile.allowedGroups || '[]') as string[]
+    if (allowedGroups.length > 0) {
+      const userGroups = user.groups || []
+      const hasAccess = allowedGroups.some(group => userGroups.includes(group))
+      if (!hasAccess) {
+        return NextResponse.json({ error: 'Forbidden: You do not have access to this profile.' }, { status: 403 })
+      }
+    }
+  }
+
   const job = await prisma.buildJob.create({
     data: {
       profileId: id,

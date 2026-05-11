@@ -10,7 +10,7 @@ import fsSync from 'fs'
 import { buildQueue } from '@/lib/queue'
 
 export async function createProfile(formData: FormData) {
-  await requireAuth()
+  const user = await requireAuth()
   
   const name = formData.get('name') as string
   const version = formData.get('version') as string || '1.0.0'
@@ -20,6 +20,7 @@ export async function createProfile(formData: FormData) {
   const sshKey = formData.get('sshKey') as string
   const packagesRaw = formData.get('packages') as string
   const configYaml = formData.get('configYaml') as string
+  const allowedGroupsRaw = formData.get('allowedGroups') as string
   
   const timezone = formData.get('timezone') as string
   const locale = formData.get('locale') as string
@@ -52,6 +53,10 @@ export async function createProfile(formData: FormData) {
     ? runcmdRaw.split('\n').map(c => c.trim()).filter(c => c.length > 0)
     : []
 
+  const allowedGroups = allowedGroupsRaw
+    ? allowedGroupsRaw.split(',').map(g => g.trim()).filter(g => g.length > 0)
+    : []
+
   await prisma.profile.create({
     data: {
       name,
@@ -62,10 +67,12 @@ export async function createProfile(formData: FormData) {
       passwordHash,
       sshKey,
       packages: JSON.stringify(packages),
-      timezone: timezone || 'UTC',
-      locale: locale || 'en_US.UTF-8',
+      timezone: timezone || 'Europe/London',
+      locale: locale || 'en_GB.UTF-8',
       runcmd: JSON.stringify(runcmd),
       configYaml: configYaml || null,
+      allowedGroups: JSON.stringify(allowedGroups),
+      userId: user.id,
       ipAddress: ipAddress || null,
       gateway: gateway || null,
       dnsServers: dnsServers || null
@@ -86,6 +93,7 @@ export async function updateProfile(id: string, formData: FormData) {
   const sshKey = formData.get('sshKey') as string
   const packagesRaw = formData.get('packages') as string
   const configYaml = formData.get('configYaml') as string
+  const allowedGroupsRaw = formData.get('allowedGroups') as string
 
   const timezone = formData.get('timezone') as string
   const locale = formData.get('locale') as string
@@ -118,6 +126,10 @@ export async function updateProfile(id: string, formData: FormData) {
     ? runcmdRaw.split('\n').map(c => c.trim()).filter(c => c.length > 0)
     : []
 
+  const allowedGroups = allowedGroupsRaw
+    ? allowedGroupsRaw.split(',').map(g => g.trim()).filter(g => g.length > 0)
+    : []
+
   await prisma.profile.update({
     where: { id },
     data: {
@@ -129,10 +141,11 @@ export async function updateProfile(id: string, formData: FormData) {
       passwordHash,
       sshKey,
       packages: JSON.stringify(packages),
-      timezone: timezone || 'UTC',
-      locale: locale || 'en_US.UTF-8',
+      timezone: timezone || 'Europe/London',
+      locale: locale || 'en_GB.UTF-8',
       runcmd: JSON.stringify(runcmd),
       configYaml: configYaml || null,
+      allowedGroups: JSON.stringify(allowedGroups),
       ipAddress: ipAddress || null,
       gateway: gateway || null,
       dnsServers: dnsServers || null
@@ -164,7 +177,7 @@ export async function deleteProfile(id: string, _formData?: FormData) {
 }
 
 export async function startBuild(id: string) {
-  await requireAuth()
+  const user = await requireAuth()
   
   const profile = await prisma.profile.findUnique({
     where: { id },
@@ -176,6 +189,7 @@ export async function startBuild(id: string) {
   const job = await prisma.buildJob.create({
     data: {
       profileId: id,
+      userId: user.id,
       version: profile.version,
       status: 'PENDING',
       log: `Job queued for image type: ${profile.baseImage.imageType} (Version: ${profile.version})...\n`

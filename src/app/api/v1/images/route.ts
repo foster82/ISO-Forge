@@ -16,7 +16,12 @@ export async function validateApiRequest(request?: Request) {
       const user = await prisma.user.findUnique({
         where: { apiKey }
       })
-      if (user) return user
+      if (user) {
+        return {
+          ...user,
+          groups: JSON.parse(user.groups || '[]') as string[]
+        }
+      }
     }
   }
 

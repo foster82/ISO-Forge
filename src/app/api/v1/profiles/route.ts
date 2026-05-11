@@ -20,5 +20,16 @@ export async function GET(request: Request) {
     orderBy: { updatedAt: 'desc' }
   })
 
-  return NextResponse.json(profiles)
+  // Filter based on LDAP groups
+  const filteredProfiles = profiles.filter(profile => {
+    if (user.role === 'ADMIN') return true
+    
+    const allowedGroups = JSON.parse(profile.allowedGroups || '[]') as string[]
+    if (allowedGroups.length === 0) return true
+    
+    const userGroups = user.groups || []
+    return allowedGroups.some(group => userGroups.includes(group))
+  })
+
+  return NextResponse.json(filteredProfiles)
 }

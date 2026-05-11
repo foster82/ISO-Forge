@@ -10,6 +10,7 @@ export const authConfig = {
         token.role = user.role
         token.username = user.username
         token.authSource = user.authSource
+        token.groups = user.groups
       }
       return token
     },
@@ -18,6 +19,7 @@ export const authConfig = {
         session.user.role = token.role as string
         session.user.username = token.username as string
         session.user.authSource = token.authSource as string
+        session.user.groups = token.groups as string[]
       }
       return session
     },

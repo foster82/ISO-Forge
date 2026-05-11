@@ -1,14 +1,14 @@
 import { prisma } from '@/lib/prisma'
-import { isAdmin, requireAuth } from '@/lib/auth-utils'
-import { ArrowLeft, Play, Disc, Shield, Globe, Calendar, Edit2, Clock, Languages, Terminal } from 'lucide-react'
+import { isAdmin, requireAuth, getCurrentUser } from '@/lib/auth-utils'
+import { ArrowLeft, Play, Disc, Shield, Globe, Calendar, Edit2, Clock, Languages, Terminal, Users } from 'lucide-react'
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import DeleteButton from '@/components/DeleteButton'
 import { startBuild, deleteProfile } from '@/lib/actions/profiles'
 import { deleteJob } from '@/lib/actions/jobs'
 
 export default async function ProfileDetails({ params }: { params: Promise<{ id: string }> }) {
-  await requireAuth()
+  const user = await requireAuth()
   const { id } = await params
   const isUserAdmin = await isAdmin()
   
@@ -19,8 +19,21 @@ export default async function ProfileDetails({ params }: { params: Promise<{ id:
 
   if (!profile) notFound()
 
+  // LDAP Group Visibility Check
+  if (!isUserAdmin) {
+    const allowedGroups = JSON.parse(profile.allowedGroups || '[]') as string[]
+    if (allowedGroups.length > 0) {
+      const userGroups = user.groups || []
+      const hasAccess = allowedGroups.some(group => userGroups.includes(group))
+      if (!hasAccess) {
+        redirect('/') // Or a custom 403 page
+      }
+    }
+  }
+
   const packages = JSON.parse(profile.packages) as string[]
   const runcmd = JSON.parse(profile.runcmd || '[]') as string[]
+  const allowedGroups = JSON.parse(profile.allowedGroups || '[]') as string[]
 
   const startBuildWithId = startBuild.bind(null, id)
   const deleteProfileWithId = deleteProfile.bind(null, id)
@@ -129,6 +142,27 @@ export default async function ProfileDetails({ params }: { params: Promise<{ id:
                 <div>
                   <p className="text-xs font-semibold text-slate-500 uppercase">Locale</p>
                   <p className="text-slate-900">{profile.locale}</p>
+                </div>
+              </div>
+              <div className="flex gap-4">
+                <div className="p-2 bg-indigo-50 rounded-lg h-fit">
+                  <Users className="w-5 h-5 text-indigo-600" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase">Visibility</p>
+                  <p className="text-slate-900">
+                    {allowedGroups.length > 0 ? (
+                      <span className="flex flex-wrap gap-1 mt-1">
+                        {allowedGroups.map(g => (
+                          <span key={g} className="px-1.5 py-0.5 bg-indigo-100 text-indigo-700 text-[10px] font-bold rounded">
+                            {g}
+                          </span>
+                        ))}
+                      </span>
+                    ) : (
+                      <span className="text-emerald-600 font-medium">Public (All Users)</span>
+                    )}
+                  </p>
                 </div>
               </div>
             </div>

@@ -30,6 +30,8 @@ export async function updateSettings(formData: FormData) {
   const companyName = formData.get('companyName') as string
   const companyLogo = formData.get('companyLogo') as string
   const authType = formData.get('authType') as string
+  const defaultTimezone = formData.get('defaultTimezone') as string
+  const defaultLocale = formData.get('defaultLocale') as string
   
   const ldapUrl = formData.get('ldapUrl') as string
   const ldapBaseDn = formData.get('ldapBaseDn') as string
@@ -49,6 +51,8 @@ export async function updateSettings(formData: FormData) {
       companyName,
       companyLogo: companyLogo || null,
       authType,
+      defaultTimezone: defaultTimezone || 'UTC',
+      defaultLocale: defaultLocale || 'en_US.UTF-8',
       ldapUrl: ldapUrl || null,
       ldapBaseDn: ldapBaseDn || null,
       ldapBindDn: ldapBindDn || null,

@@ -1,5 +1,5 @@
 generator client {
-  provider = "prisma-client"
+  provider = "prisma-client-js"
   output   = "./generated/client"
 }
 
@@ -41,16 +41,19 @@ model Profile {
   passwordHash String     // hashed password for autoinstall
   sshKey       String?    // Public SSH key
   packages     String     // JSON array of strings
-  timezone     String     @default("UTC")
-  locale       String     @default("en_US.UTF-8")
+  timezone     String     @default("Europe/London")
+  locale       String     @default("en_GB.UTF-8")
   runcmd       String     @default("[]") // JSON array of strings
   configYaml   String?    // Additional cloud-init overrides
+  allowedGroups String    @default("[]") // JSON array of LDAP groups that can see/use this profile
   ipAddress    String?    // Optional static IP (e.g. 192.168.1.10/24)
   gateway      String?    // Optional gateway
   dnsServers   String?    // Optional comma-separated DNS
   baseImageId  String
   baseImage    BaseImage  @relation(fields: [baseImageId], references: [id])
   buildJobs    BuildJob[]
+  userId       String?    // Creator of the profile
+  user         User?      @relation(fields: [userId], references: [id])
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 }
@@ -66,6 +69,8 @@ model BuildJob {
   bootTestLog    String?   @default("")
   profileId      String
   profile        Profile   @relation(fields: [profileId], references: [id])
+  userId         String?    // User who started the build
+  user           User?      @relation(fields: [userId], references: [id])
   createdAt      DateTime  @default(now())
   completedAt    DateTime?
 }
@@ -79,6 +84,10 @@ model GlobalSettings {
   jobRetentionDays   Int    @default(30)
   buildRetentionCount Int    @default(10) // Per profile
   autoCleanupEnabled Boolean @default(true)
+  
+  // Regional Defaults
+  defaultTimezone    String   @default("Europe/London")
+  defaultLocale      String   @default("en_GB.UTF-8")
   
   // Auth Settings
   authType     String   @default("LOCAL") // LOCAL, LDAP, BOTH
@@ -124,6 +133,8 @@ model User {
   authSource    String    @default("LOCAL") // LOCAL, LDAP
   apiKey        String?   @unique   // Static API key for CLI/CI
   groups        String    @default("[]") // JSON array of strings
+  profiles      Profile[]
+  buildJobs     BuildJob[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }

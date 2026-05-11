@@ -7,6 +7,8 @@ import { clsx } from 'clsx'
 import { deleteImage } from '@/lib/actions/images'
 import AutoRefresh from '@/components/AutoRefresh'
 import DownloadProgressBar from '@/components/DownloadProgressBar'
+import fs from 'fs'
+import { SystemStats } from '@/lib/system-stats'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,6 +25,21 @@ export default async function ImagesList({
     orderBy: { createdAt: 'desc' }
   })
 
+  // Add file sizes to images
+  const imagesWithSizes = await Promise.all(images.map(async (img) => {
+    let size = 0
+    try {
+      if (fs.existsSync(img.path)) {
+        const stats = fs.statSync(img.path)
+        size = stats.size
+      }
+    } catch (e) {
+      console.error(`Failed to get size for ${img.path}:`, e)
+    }
+    return { ...img, size }
+  }))
+
+  const storageStats = await SystemStats.getStorageStats()
   const isDownloading = images.some(img => img.status === 'DOWNLOADING')
 
   return (
@@ -49,6 +66,43 @@ export default async function ImagesList({
       </header>
 
       <main className="flex-1 max-w-6xl mx-auto w-full p-6 space-y-6">
+        {/* Storage Summary */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Total Disk Space</p>
+            <p className="text-lg font-bold text-slate-900">{SystemStats.formatBytes(storageStats.totalBytes)}</p>
+          </div>
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Free Space</p>
+            <p className={clsx(
+              "text-lg font-bold",
+              storageStats.freeBytes < 10 * 1024 * 1024 * 1024 ? "text-red-600" : "text-slate-900"
+            )}>
+              {SystemStats.formatBytes(storageStats.freeBytes)}
+            </p>
+          </div>
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">App Storage</p>
+            <p className="text-lg font-bold text-slate-900">{SystemStats.formatBytes(storageStats.storageDirSize)}</p>
+          </div>
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Usage</p>
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                <div 
+                  className={clsx(
+                    "h-full transition-all",
+                    storageStats.percentUsed > 90 ? "bg-red-500" : 
+                    storageStats.percentUsed > 70 ? "bg-amber-500" : "bg-indigo-500"
+                  )}
+                  style={{ width: `${storageStats.percentUsed}%` }}
+                />
+              </div>
+              <span className="text-sm font-bold text-slate-700">{storageStats.percentUsed}%</span>
+            </div>
+          </div>
+        </div>
+
         {/* Tabs */}
         <div className="flex items-center border-b border-slate-200">
           <Link 
@@ -84,19 +138,20 @@ export default async function ImagesList({
                 <th className="px-6 py-4">Image Name</th>
                 <th className="px-6 py-4">Arch</th>
                 <th className="px-6 py-4">Status</th>
+                <th className="px-6 py-4">Size</th>
                 <th className="px-6 py-4">Filename</th>
                 <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {images.length === 0 ? (
+              {imagesWithSizes.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-slate-500 italic">
+                  <td colSpan={6} className="px-6 py-12 text-center text-slate-500 italic">
                     No {type === 'ISO' ? 'ISOs' : 'Cloud Images'} found.
                   </td>
                 </tr>
               ) : (
-                images.map((img) => (
+                imagesWithSizes.map((img) => (
                   <tr key={img.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
@@ -142,6 +197,11 @@ export default async function ImagesList({
                       {img.status === 'DOWNLOADING' && (
                         <DownloadProgressBar imageId={img.id} initialProgress={img.downloadProgress} />
                       )}
+                    </td>
+                    <td className="px-6 py-4">
+                      <p className="text-xs font-bold text-slate-600">
+                        {img.size > 0 ? SystemStats.formatBytes(img.size) : '---'}
+                      </p>
                     </td>
                     <td className="px-6 py-4">
                       <p className="text-xs font-mono text-slate-500 truncate max-w-xs">{img.filename}</p>

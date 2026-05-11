@@ -1,12 +1,14 @@
 import { getSettings } from '@/lib/settings'
 import { requireAdmin } from '@/lib/auth-utils'
-import { ArrowLeft, Save, Building, Image as ImageIcon, Shield, Network, Trash2, Wrench, Database, Download, Plus, Users, Edit2, Globe } from 'lucide-react'
+import { ArrowLeft, Save, Building, Image as ImageIcon, Shield, Network, Trash2, Wrench, Database, Download, Plus, Users, Edit2, Globe, Bell, HardDrive, Disc } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { clsx } from 'clsx'
 import { updateSettings } from '@/lib/actions/settings'
 import { cleanupJobs } from '@/lib/actions/jobs'
 import { createOpenStackProvider, deleteOpenStackProvider, getOpenStackProviders } from '@/lib/actions/openstack-providers'
 import { BackupEngine } from '@/lib/backup-engine'
+import { SystemStats } from '@/lib/system-stats'
 import { triggerBackup, removeBackup } from '@/lib/actions/backups'
 import DeleteButton from '@/components/DeleteButton'
 import LdapTester from '@/components/LdapTester'
@@ -17,6 +19,7 @@ export default async function SettingsPage() {
   const settings = await getSettings()
   const backups = await BackupEngine.listBackups()
   const providers = await getOpenStackProviders()
+  const storageStats = await SystemStats.getStorageStats()
 
   const formatSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes'
@@ -90,6 +93,46 @@ export default async function SettingsPage() {
                         </div>
                       )}
                     </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Regional Defaults Section */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="p-8 space-y-6">
+                <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                  <Globe className="w-5 h-5 text-indigo-600" />
+                  Regional Defaults
+                </h2>
+                <p className="text-sm text-slate-500">Default settings for new profiles. These can be overridden on a per-profile basis.</p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label htmlFor="defaultTimezone" className="text-sm font-medium text-slate-700">
+                      Default Timezone
+                    </label>
+                    <input
+                      type="text"
+                      id="defaultTimezone"
+                      name="defaultTimezone"
+                      defaultValue={settings.defaultTimezone}
+                      placeholder="e.g. Europe/London"
+                      className="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label htmlFor="defaultLocale" className="text-sm font-medium text-slate-700">
+                      Default Locale
+                    </label>
+                    <input
+                      type="text"
+                      id="defaultLocale"
+                      name="defaultLocale"
+                      defaultValue={settings.defaultLocale}
+                      placeholder="e.g. en_GB.UTF-8"
+                      className="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                    />
                   </div>
                 </div>
               </div>
@@ -338,8 +381,79 @@ export default async function SettingsPage() {
             </div>
           </div>
 
-          {/* Database Backups Section */}
+          {/* Storage & Image Management Section */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-8 space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                    <Database className="w-5 h-5 text-indigo-600" />
+                    Storage & Image Management
+                  </h2>
+                  <p className="text-sm text-slate-500 mt-1">Monitor disk usage and manage base images and build outputs to prevent running out of space.</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                  <Link
+                    href="/images"
+                    className="inline-flex items-center gap-2 bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-bold hover:bg-slate-50 transition-all shadow-sm"
+                  >
+                    <Disc className="w-4 h-4" />
+                    Manage Base Images
+                  </Link>
+                  <Link
+                    href="/settings/builds"
+                    className="inline-flex items-center gap-2 bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-bold hover:bg-slate-50 transition-all shadow-sm"
+                  >
+                    <HardDrive className="w-4 h-4" />
+                    Manage Build Outputs
+                  </Link>
+                  <Link
+                    href="/settings/users"
+                    className="inline-flex items-center gap-2 bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-bold hover:bg-slate-50 transition-all shadow-sm"
+                  >
+                    <Users className="w-4 h-4" />
+                    User Usage & Quotas
+                  </Link>
+                  </div>                  </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Total Disk Space</p>
+                  <p className="text-2xl font-bold text-slate-900">{formatSize(storageStats.totalBytes)}</p>
+                  <div className="mt-3 w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                    <div 
+                      className={clsx(
+                        "h-full rounded-full transition-all",
+                        storageStats.percentUsed > 90 ? "bg-red-500" : 
+                        storageStats.percentUsed > 70 ? "bg-amber-500" : "bg-indigo-500"
+                      )}
+                      style={{ width: `${storageStats.percentUsed}%` }}
+                    />
+                  </div>
+                  <p className="mt-2 text-[10px] text-slate-500 font-medium">
+                    {storageStats.percentUsed}% used on system partition
+                  </p>
+                </div>
+
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">App Storage Dir</p>
+                  <p className="text-2xl font-bold text-slate-900">{formatSize(storageStats.storageDirSize)}</p>
+                  <p className="mt-2 text-[10px] text-slate-500 font-medium">
+                    Total size of all ISOs, images, and builds
+                  </p>
+                </div>
+
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Available Space</p>
+                  <p className="text-2xl font-bold text-slate-900">{formatSize(storageStats.freeBytes)}</p>
+                  <p className="mt-2 text-[10px] text-slate-500 font-medium italic">
+                    {storageStats.freeBytes < 10 * 1024 * 1024 * 1024 ? "Warning: Low disk space!" : "Sufficient space remaining"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Database Backups Section */}          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-8 space-y-6">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">

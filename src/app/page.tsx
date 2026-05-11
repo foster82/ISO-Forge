@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { getSettings } from '@/lib/settings'
-import { isAdmin } from '@/lib/auth-utils'
+import { isAdmin, getCurrentUser } from '@/lib/auth-utils'
 import { signOut } from '@/auth'
 import { Plus, Disc, FileText, Settings, Rocket, Clock, ChevronRight, Edit2, Server, LogOut, HardDrive, Activity, CheckCircle, XCircle } from 'lucide-react'
 import Link from 'next/link'
@@ -24,8 +24,21 @@ export default async function Dashboard() {
     orderBy: { createdAt: 'desc' }
   })
 
-  const isoProfiles = profiles.filter(p => p.baseImage.imageType === 'ISO')
-  const cloudProfiles = profiles.filter(p => p.baseImage.imageType === 'CLOUD_IMAGE')
+  // Filter profiles based on LDAP groups
+  const user = await getCurrentUser()
+  const userGroups = user?.groups || []
+  
+  const filteredProfiles = profiles.filter(profile => {
+    if (user?.role === 'ADMIN') return true
+    
+    const allowedGroups = JSON.parse(profile.allowedGroups || '[]') as string[]
+    if (allowedGroups.length === 0) return true
+    
+    return allowedGroups.some(group => userGroups.includes(group))
+  })
+
+  const isoProfiles = filteredProfiles.filter(p => p.baseImage.imageType === 'ISO')
+  const cloudProfiles = filteredProfiles.filter(p => p.baseImage.imageType === 'CLOUD_IMAGE')
 
   const baseImageCount = await prisma.baseImage.count()
 
@@ -276,7 +289,14 @@ export default async function Dashboard() {
 
           {/* Recent Build Jobs Sidebar */}
           <div className="space-y-4">
-            <h2 className="text-lg font-bold text-slate-900">Recent Build Jobs</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-slate-900">Recent Build Jobs</h2>
+              {isUserAdmin && (
+                <Link href="/settings/builds" className="text-xs font-bold text-indigo-600 hover:text-indigo-700">
+                  Manage All
+                </Link>
+              )}
+            </div>
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden divide-y divide-slate-100">
               {buildJobs.length === 0 ? (
                 <div className="p-8 text-center text-slate-500 text-sm">
