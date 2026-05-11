@@ -316,6 +316,28 @@ export default async function SettingsPage() {
             </div>
           </div>
 
+          {/* Webhooks Section */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-8 space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                    <Bell className="w-5 h-5 text-indigo-600" />
+                    Outgoing Webhooks
+                  </h2>
+                  <p className="text-sm text-slate-500 mt-1">Send real-time notifications to Slack, Discord, or custom APIs.</p>
+                </div>
+                <Link
+                  href="/settings/webhooks"
+                  className="inline-flex items-center gap-2 bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-bold hover:bg-slate-50 transition-all shadow-sm"
+                >
+                  <Edit2 className="w-4 h-4" />
+                  Manage Webhooks
+                </Link>
+              </div>
+            </div>
+          </div>
+
           {/* Database Backups Section */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-8 space-y-6">

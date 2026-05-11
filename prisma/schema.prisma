@@ -93,6 +93,17 @@ model GlobalSettings {
   updatedAt    DateTime @updatedAt
 }
 
+model Webhook {
+  id          String   @id @default(cuid())
+  name        String
+  url         String
+  eventTypes  String   // JSON array of events: BUILD_COMPLETED, BUILD_FAILED, BOOT_TEST_PASSED, etc.
+  secret      String?  // Optional HMAC secret
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
 model OpenStackProvider {
   id          String   @id @default(cuid())
   name        String   // e.g. "Production Cloud", "Dev Lab"

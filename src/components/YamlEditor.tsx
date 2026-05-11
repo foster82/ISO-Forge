@@ -1,8 +1,8 @@
 'use client'
 
-import React, { useState, useMemo } from 'react'
-import yaml from 'js-yaml'
-import { AlertCircle, CheckCircle2 } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react'
+import { validateCloudInit, ValidationResult } from '@/lib/actions/validation'
 
 interface YamlEditorProps {
   initialValue?: string
@@ -11,19 +11,22 @@ interface YamlEditorProps {
 
 export default function YamlEditor({ initialValue = '', name }: YamlEditorProps) {
   const [value, setValue] = useState(initialValue)
+  const [validation, setValidation] = useState<ValidationResult>({ valid: true })
+  const [isValidating, setIsValidating] = useState(false)
 
-  const { error, isValid } = useMemo(() => {
-    if (!value.trim()) {
-      return { error: null, isValid: true }
-    }
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (!value.trim()) {
+        setValidation({ valid: true })
+        return
+      }
+      setIsValidating(true)
+      const result = await validateCloudInit(value)
+      setValidation(result)
+      setIsValidating(false)
+    }, 500)
 
-    try {
-      yaml.load(value)
-      return { error: null, isValid: true }
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e)
-      return { error: msg, isValid: false }
-    }
+    return () => clearTimeout(timer)
   }, [value])
 
   return (
@@ -36,32 +39,40 @@ export default function YamlEditor({ initialValue = '', name }: YamlEditorProps)
           rows={10}
           placeholder="# Example: late-commands: [ echo 'hello' ]"
           className={`w-full px-4 py-3 font-mono text-sm border rounded-lg focus:ring-2 outline-none transition-all ${
-            isValid 
+            validation.valid 
               ? 'border-slate-300 focus:ring-indigo-500 focus:border-indigo-500' 
               : 'border-red-300 focus:ring-red-500 focus:border-red-500 bg-red-50/30'
           }`}
         />
         
-        <div className="absolute top-3 right-3">
-          {value.trim() && (
-            isValid 
+        <div className="absolute top-3 right-3 flex items-center gap-2">
+          {isValidating && <Loader2 className="w-4 h-4 text-slate-400 animate-spin" />}
+          {!isValidating && value.trim() && (
+            validation.valid 
               ? <CheckCircle2 className="w-5 h-5 text-emerald-500" />
               : <AlertCircle className="w-5 h-5 text-red-500" />
           )}
         </div>
       </div>
 
-      {error && (
+      {validation.error && (
         <div className="p-3 bg-red-50 border border-red-100 rounded-lg flex gap-3 items-start">
           <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 shrink-0" />
-          <p className="text-xs text-red-700 font-mono whitespace-pre-wrap">{error}</p>
+          <div>
+            <p className="text-xs text-red-700 font-mono whitespace-pre-wrap">{validation.error}</p>
+            {validation.line && (
+              <p className="text-[10px] text-red-500 mt-1 font-bold">
+                Line {validation.line}, Column {validation.column}
+              </p>
+            )}
+          </div>
         </div>
       )}
 
-      {!error && value.trim() && (
+      {!validation.error && value.trim() && !isValidating && (
         <p className="text-xs text-emerald-600 flex items-center gap-1 font-medium">
           <CheckCircle2 className="w-3 h-3" />
-          YAML syntax is valid
+          Configuration is valid
         </p>
       )}
 
@@ -71,3 +82,4 @@ export default function YamlEditor({ initialValue = '', name }: YamlEditorProps)
     </div>
   )
 }
+

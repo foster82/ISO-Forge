@@ -109,6 +109,8 @@ async function handleCleanupJob() {
   }
 }
 
+import { WebhookEngine } from './webhook-engine'
+
 async function handleBuildJob(jobId: string, payload: Omit<BuildOptions, 'onLog'>) {
   try {
     await prisma.buildJob.update({
@@ -134,6 +136,19 @@ async function handleBuildJob(jobId: string, payload: Omit<BuildOptions, 'onLog'
         outputPath: payload.outputPath
       }
     })
+
+    const finalJob = await prisma.buildJob.findUnique({
+      where: { id: jobId },
+      include: { profile: true }
+    })
+    if (finalJob) {
+      await WebhookEngine.trigger('BUILD_COMPLETED', {
+        jobId: finalJob.id,
+        profileName: finalJob.profile.name,
+        version: finalJob.version,
+        outputPath: finalJob.outputPath
+      })
+    }
   } catch (error: unknown) {
     const currentJob = await prisma.buildJob.findUnique({ where: { id: jobId } })
     const errorMessage = error instanceof Error ? error.message : String(error)
@@ -144,6 +159,18 @@ async function handleBuildJob(jobId: string, payload: Omit<BuildOptions, 'onLog'
         log: (currentJob?.log || '') + `\nFATAL ERROR: ${errorMessage}` 
       }
     })
+
+    const finalJob = await prisma.buildJob.findUnique({
+      where: { id: jobId },
+      include: { profile: true }
+    })
+    if (finalJob) {
+      await WebhookEngine.trigger('BUILD_FAILED', {
+        jobId: finalJob.id,
+        profileName: finalJob.profile.name,
+        error: errorMessage
+      })
+    }
     throw error
   }
 }
@@ -175,6 +202,18 @@ async function handleBootTestJob(jobId: string, payload: Omit<TestOptions, 'onLo
         vncPort: null 
       }
     })
+
+    const finalJob = await prisma.buildJob.findUnique({
+      where: { id: jobId },
+      include: { profile: true }
+    })
+    if (finalJob) {
+      await WebhookEngine.trigger(success ? 'BOOT_TEST_PASSED' : 'BOOT_TEST_FAILED', {
+        jobId: finalJob.id,
+        profileName: finalJob.profile.name,
+        bootTestStatus: finalJob.bootTestStatus
+      })
+    }
   } catch (error: unknown) {
     const currentJob = await prisma.buildJob.findUnique({ where: { id: jobId } })
     const errorMessage = error instanceof Error ? error.message : String(error)
@@ -185,6 +224,18 @@ async function handleBootTestJob(jobId: string, payload: Omit<TestOptions, 'onLo
         bootTestLog: (currentJob?.bootTestLog || '') + `\n[FATAL ERROR] ${errorMessage}`
       }
     })
+
+    const finalJob = await prisma.buildJob.findUnique({
+      where: { id: jobId },
+      include: { profile: true }
+    })
+    if (finalJob) {
+      await WebhookEngine.trigger('BOOT_TEST_FAILED', {
+        jobId: finalJob.id,
+        profileName: finalJob.profile.name,
+        error: errorMessage
+      })
+    }
     throw error
   }
 }
