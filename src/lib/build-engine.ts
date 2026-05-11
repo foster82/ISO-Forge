@@ -140,22 +140,37 @@ serial --unit=0 --speed=115200 --word=8 --parity=no --stop=1
 terminal_input --append serial
 terminal_output --append serial
 `
-      grubContent = serialGrubConfig + grubContent
+      if (!grubContent.includes('terminal_input --append serial')) {
+        grubContent = serialGrubConfig + grubContent
+      }
 
       // Inject autoinstall parameters and serial console
-      const kernelRegex = /linux\s+\/casper\/vmlinuz.*---/
-      if (kernelRegex.test(grubContent)) {
-        // Use single console to avoid device conflicts
-        // Escaping semicolon for GRUB
-        const params = 'autoinstall "ds=nocloud\\;s=/cdrom/nocloud/" console=ttyS0,115200n8'
-        grubContent = grubContent.replace(
-          kernelRegex,
-          `linux /casper/vmlinuz ${params} ---`
-        )
-        options.onLog('Successfully injected autoinstall parameters into grub.cfg')
-        options.onLog('Modified GRUB line: ' + grubContent.match(/linux.*/)?.[0])
+      // Match all linux kernel lines
+      const linuxLineRegex = /^\s*linux\s+\/casper\/vmlinuz.*/gm
+      if (linuxLineRegex.test(grubContent)) {
+        options.onLog('Found linux kernel lines in grub.cfg. Injecting parameters...')
+        grubContent = grubContent.replace(linuxLineRegex, (line) => {
+          // If already has autoinstall, don't double up
+          if (line.includes('autoinstall')) return line;
+          
+          // Remove existing '---' and anything after it to append our params before it
+          let newLine = line.replace(/\s+---.*/, '').trim();
+          
+          // Remove quiet/splash to see more logs
+          newLine = newLine.replace(/\s+quiet/g, '').replace(/\s+splash/g, '');
+          
+          // Add our params and a fresh '---'
+          // We use ds=nocloud;s=/cdrom/nocloud/ (with backslash for GRUB)
+          return `${newLine} autoinstall "ds=nocloud\\;s=/cdrom/nocloud/" console=ttyS0,115200n8 ---`
+        });
+        
+        const modifiedLines = grubContent.match(linuxLineRegex);
+        if (modifiedLines) {
+          options.onLog('Modified GRUB lines:')
+          modifiedLines.forEach(l => options.onLog('  ' + l.trim()))
+        }
       } else {
-        options.onLog('Warning: Could not find kernel line in grub.cfg to inject parameters')
+        options.onLog('Warning: Could not find any kernel lines (linux /casper/vmlinuz) in grub.cfg')
       }
       
       await fs.writeFile(grubPath, grubContent)

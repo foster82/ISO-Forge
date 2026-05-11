@@ -1,8 +1,10 @@
 'use client'
 
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 
 interface LogViewerProps {
+  jobId?: string
+  logType?: 'build' | 'boot'
   content: string
   title: string
   icon: React.ReactNode
@@ -10,14 +12,48 @@ interface LogViewerProps {
   variant?: 'emerald' | 'slate'
 }
 
-export default function LogViewer({ content, title, icon, isActive, variant = 'emerald' }: LogViewerProps) {
+export default function LogViewer({ jobId, logType = 'build', content, title, icon, isActive, variant = 'emerald' }: LogViewerProps) {
+  const [logs, setLogs] = useState(content)
+  const [prevContent, setPrevContent] = useState(content)
   const scrollRef = useRef<HTMLDivElement>(null)
+
+  // Sync with initial content from server when it changes (e.g. on router.refresh)
+  if (content !== prevContent) {
+    setLogs(content)
+    setPrevContent(content)
+  }
+
+  useEffect(() => {
+    if (!isActive || !jobId) return
+
+    const eventSource = new EventSource(`/api/jobs/stream/${jobId}`)
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data)
+        if (data.type === logType) {
+          setLogs((prev) => prev + data.message)
+        }
+      } catch (e) {
+        console.error('Failed to parse log event:', e)
+      }
+    }
+
+    eventSource.onerror = () => {
+      console.warn('SSE connection failed, falling back to polling updates.')
+      eventSource.close()
+    }
+
+    return () => {
+      eventSource.close()
+    }
+  }, [isActive, jobId, logType])
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
-  }, [content])
+  }, [logs])
 
   return (
     <div className="bg-slate-900 rounded-xl border border-slate-800 shadow-lg overflow-hidden flex flex-col h-[400px]">
@@ -35,7 +71,7 @@ export default function LogViewer({ content, title, icon, isActive, variant = 'e
       </div>
       <div ref={scrollRef} className="flex-1 p-6 font-mono text-[11px] overflow-y-auto bg-black scroll-smooth">
         <pre className={`${variant === 'emerald' ? 'text-emerald-400/90' : 'text-slate-300'} whitespace-pre-wrap leading-relaxed`}>
-          {content}
+          {logs}
         </pre>
         {isActive && (
           <div className="mt-4 flex items-center gap-2 text-amber-500 animate-pulse italic">

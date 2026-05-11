@@ -1,14 +1,11 @@
 import { prisma } from '@/lib/prisma'
-import { isAdmin, requireAdmin, requireAuth } from '@/lib/auth-utils'
+import { isAdmin, requireAuth } from '@/lib/auth-utils'
 import { ArrowLeft, Play, Disc, Shield, Globe, Calendar, Edit2 } from 'lucide-react'
 import Link from 'next/link'
-import { notFound, redirect } from 'next/navigation'
-import { BuildEngine } from '@/lib/build-engine'
-import path from 'path'
-import fs from 'fs/promises'
-import fsSync from 'fs'
+import { notFound } from 'next/navigation'
 import DeleteButton from '@/components/DeleteButton'
-import { revalidatePath } from 'next/cache'
+import { startBuild, deleteProfile } from '@/lib/actions/profiles'
+import { deleteJob } from '@/lib/actions/jobs'
 
 export default async function ProfileDetails({ params }: { params: Promise<{ id: string }> }) {
   await requireAuth()
@@ -24,123 +21,8 @@ export default async function ProfileDetails({ params }: { params: Promise<{ id:
 
   const packages = JSON.parse(profile.packages) as string[]
 
-  async function startBuild() {
-    'use server'
-    await requireAuth()
-    
-    // Fetch fresh profile data to avoid closure issues
-    const freshProfile = await prisma.profile.findUnique({
-      where: { id },
-      include: { baseImage: true }
-    })
-
-    if (!freshProfile) return
-
-    // 1. Create a BuildJob record
-    const job = await prisma.buildJob.create({
-      data: {
-        profileId: id,
-        status: 'BUILDING',
-        log: `Job started for image type: ${freshProfile.baseImage.imageType}...\n`
-      }
-    })
-
-    const extension = freshProfile.baseImage.imageType === 'ISO' ? 'iso' : 
-                     (freshProfile.baseImage.filename.split('.').pop() || 'img')
-    
-    const outputPath = path.join(process.cwd(), 'storage', 'builds', `custom-${job.id}.${extension}`)
-    
-    // Ensure builds directory exists
-    await fs.mkdir(path.join(process.cwd(), 'storage', 'builds'), { recursive: true })
-
-    // Use a queue to prevent logging race conditions
-    let logQueue = Promise.resolve()
-
-    // 2. Trigger Build in background
-    BuildEngine.createCustomImage({
-      baseIsoPath: freshProfile.baseImage.path,
-      imageType: freshProfile.baseImage.imageType as 'ISO' | 'CLOUD_IMAGE',
-      outputPath,
-      hostname: freshProfile.hostname,
-      username: freshProfile.username,
-      passwordHash: freshProfile.passwordHash,
-      sshKey: freshProfile.sshKey || undefined,
-      packages,
-      configYaml: freshProfile.configYaml || undefined,
-      ipAddress: freshProfile.ipAddress || undefined,
-      gateway: freshProfile.gateway || undefined,
-      dnsServers: freshProfile.dnsServers ? freshProfile.dnsServers.split(',').map(d => d.trim()) : undefined,
-      onLog: (msg) => {
-        logQueue = logQueue.then(async () => {
-          try {
-            await prisma.buildJob.update({
-              where: { id: job.id },
-              data: { log: { append: msg + '\n' } } as any // Trying Prisma's append if supported, else fallback
-            })
-          } catch {
-            // Fallback for adapters that don't support atomic append
-            const currentJob = await prisma.buildJob.findUnique({ where: { id: job.id } })
-            await prisma.buildJob.update({
-              where: { id: job.id },
-              data: { log: (currentJob?.log || '') + msg + '\n' }
-            })
-          }
-        })
-      }
-    }).then(async () => {
-      await prisma.buildJob.update({
-        where: { id: job.id },
-        data: { 
-          status: 'COMPLETED', 
-          outputPath,
-          completedAt: new Date()
-        }
-      })
-    }).catch(async (error: unknown) => {
-      const currentJob = await prisma.buildJob.findUnique({ where: { id: job.id } })
-      const errorMessage = error instanceof Error ? error.message : String(error)
-      await prisma.buildJob.update({
-        where: { id: job.id },
-        data: { 
-          status: 'FAILED', 
-          log: (currentJob?.log || '') + `\nFATAL ERROR: ${errorMessage}` 
-        }
-      })
-    })
-
-    redirect(`/jobs/${job.id}`)
-  }
-
-  async function deleteProfile() {
-    'use server'
-    await requireAdmin()
-    // Also delete associated build files
-    const jobs = await prisma.buildJob.findMany({ where: { profileId: id } })
-    for (const job of jobs) {
-      if (job.outputPath && fsSync.existsSync(job.outputPath)) {
-        fsSync.unlinkSync(job.outputPath)
-      }
-    }
-    await prisma.buildJob.deleteMany({ where: { profileId: id } })
-    await prisma.profile.delete({ where: { id } })
-    redirect('/')
-  }
-
-  async function deleteJob(formData: FormData) {
-    'use server'
-    await requireAdmin()
-    const jobId = formData.get('id') as string
-    const job = await prisma.buildJob.findUnique({ where: { id: jobId } })
-    
-    if (job) {
-      if (job.outputPath && fsSync.existsSync(job.outputPath)) {
-        fsSync.unlinkSync(job.outputPath)
-      }
-      await prisma.buildJob.delete({ where: { id: jobId } })
-    }
-    
-    revalidatePath(`/profiles/${id}`)
-  }
+  const startBuildWithId = startBuild.bind(null, id)
+  const deleteProfileWithId = deleteProfile.bind(null, id)
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-50">
@@ -162,7 +44,7 @@ export default async function ProfileDetails({ params }: { params: Promise<{ id:
             <div className="flex items-center gap-3">
               {isUserAdmin && (
                 <DeleteButton 
-                  action={deleteProfile} 
+                  action={deleteProfileWithId} 
                   confirmMessage="Are you sure you want to delete this profile? All associated build jobs and files will also be deleted."
                 />
               )}
@@ -172,7 +54,7 @@ export default async function ProfileDetails({ params }: { params: Promise<{ id:
                 <Edit2 className="w-4 h-4" />
                 Edit Profile
               </Link>
-              <form action={startBuild}>
+              <form action={startBuildWithId}>
                 <button 
                   type="submit"
                   className="inline-flex items-center gap-2 bg-indigo-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-indigo-700 transition-colors shadow-sm"
@@ -315,6 +197,7 @@ export default async function ProfileDetails({ params }: { params: Promise<{ id:
                         <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
                           job.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700' :
                           job.status === 'FAILED' ? 'bg-red-100 text-red-700' :
+                          job.status === 'PENDING' ? 'bg-slate-100 text-slate-600' :
                           job.status === 'BUILDING' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'
                         }`}>
                           {job.status}
@@ -326,7 +209,11 @@ export default async function ProfileDetails({ params }: { params: Promise<{ id:
                     <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
                       {isUserAdmin && (
                         <DeleteButton 
-                          action={deleteJob}
+                          action={async (formData) => {
+                            'use server'
+                            const jobId = formData.get('id') as string
+                            await deleteJob(jobId)
+                          }}
                           id={job.id}
                           confirmMessage="Delete this build job and its output file?"
                           iconSize={3.5}

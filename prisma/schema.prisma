@@ -8,16 +8,17 @@ datasource db {
 }
 
 model BaseImage {
-  id          String     @id @default(cuid())
-  name        String     // e.g. Ubuntu 24.04 Server
-  version     String
-  filename    String
-  path        String     // Path to the downloaded file
-  imageType   String     @default("ISO") // ISO, CLOUD_IMAGE
-  status      String     @default("READY") // READY, DOWNLOADING, FAILED
-  downloadUrl String?
-  createdAt   DateTime   @default(now())
-  profiles    Profile[]
+  id              String     @id @default(cuid())
+  name            String     // e.g. Ubuntu 24.04 Server
+  version         String
+  filename        String
+  path            String     // Path to the downloaded file
+  imageType       String     @default("ISO") // ISO, CLOUD_IMAGE
+  status          String     @default("READY") // READY, DOWNLOADING, FAILED
+  downloadUrl     String?
+  downloadProgress Float     @default(0) // Percentage 0-100
+  createdAt       DateTime   @default(now())
+  profiles        Profile[]
 }
 
 model Profile {

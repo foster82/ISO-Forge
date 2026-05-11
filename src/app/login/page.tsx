@@ -1,6 +1,7 @@
 import { signIn } from "@/auth"
 import { Rocket, Lock, User, AlertCircle } from "lucide-react"
 import { getSettings } from "@/lib/settings"
+import { AuthError } from "next-auth"
 
 export default async function LoginPage({
   searchParams,
@@ -14,12 +15,12 @@ export default async function LoginPage({
     "use server"
     try {
       await signIn("credentials", formData)
-    } catch (error) {
-      // In NextAuth v5, redirected errors are expected
-      if ((error as any).type === "CredentialsSignin") {
-        return // handled by searchParams error
+    } catch (err) {
+      if (err instanceof AuthError) {
+        // Handled by NextAuth redirection or searchParams
+        return
       }
-      throw error
+      throw err
     }
   }
 

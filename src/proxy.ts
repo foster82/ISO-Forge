@@ -7,7 +7,7 @@ const { auth } = NextAuth(authConfig)
 export default auth((req) => {
   const isAuth = !!req.auth
   const isSettingsPage = req.nextUrl.pathname.startsWith("/settings")
-  const role = (req.auth?.user as any)?.role
+  const role = req.auth?.user?.role
 
   if (isSettingsPage && role !== "ADMIN") {
     // If authenticated but not admin, redirect to home

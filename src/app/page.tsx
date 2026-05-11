@@ -1,21 +1,11 @@
 import { prisma } from '@/lib/prisma'
 import { getSettings } from '@/lib/settings'
-import { isAdmin, requireAdmin } from '@/lib/auth-utils'
+import { isAdmin } from '@/lib/auth-utils'
 import { signOut } from '@/auth'
 import { Plus, Disc, FileText, Settings, Rocket, Clock, ChevronRight, Edit2, Server, LogOut } from 'lucide-react'
 import Link from 'next/link'
 import DeleteButton from '@/components/DeleteButton'
-import fs from 'fs'
-import { revalidatePath } from 'next/cache'
-
-interface ProfileWithBaseImage {
-  id: string
-  name: string
-  hostname: string
-  baseImage: {
-    name: string
-  }
-}
+import { deleteJob } from '@/lib/actions/jobs'
 
 export default async function Dashboard() {
   const settings = await getSettings()
@@ -37,26 +27,10 @@ export default async function Dashboard() {
 
   const baseImageCount = await prisma.baseImage.count()
 
-  async function deleteJob(formData: FormData) {
-    'use server'
-    await requireAdmin()
-    const id = formData.get('id') as string
-    const job = await prisma.buildJob.findUnique({ where: { id } })
-    
-    if (job) {
-      if (job.outputPath && fs.existsSync(job.outputPath)) {
-        fs.unlinkSync(job.outputPath)
-      }
-      await prisma.buildJob.delete({ where: { id } })
-    }
-    
-    revalidatePath('/')
-  }
-
   return (
     <div className="flex flex-col min-h-screen bg-slate-50">
       <header className="bg-white border-b border-slate-200 px-6 py-4">
-        <div className="flex items-center justify-between max-w-7xl mx-auto">
+        <div className="flex items-center justify-between max-w-7xl mx-auto v-full">
           <div className="flex items-center gap-3">
             {settings.companyLogo ? (
               <img src={settings.companyLogo} alt="Logo" className="w-10 h-10 object-contain" />
@@ -196,6 +170,7 @@ export default async function Dashboard() {
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
                           job.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700' :
                           job.status === 'FAILED' ? 'bg-red-100 text-red-700' :
+                          job.status === 'PENDING' ? 'bg-slate-100 text-slate-600' :
                           job.status === 'BUILDING' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'
                         }`}>
                           {job.status}
@@ -208,7 +183,11 @@ export default async function Dashboard() {
                     {isUserAdmin && (
                       <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
                         <DeleteButton 
-                          action={deleteJob}
+                          action={async (formData) => {
+                            'use server'
+                            const id = formData.get('id') as string
+                            await deleteJob(id)
+                          }}
                           id={job.id}
                           confirmMessage="Delete this build job and its output file?"
                           iconSize={3.5}
@@ -224,6 +203,15 @@ export default async function Dashboard() {
       </main>
     </div>
   )
+}
+
+interface ProfileWithBaseImage {
+  id: string
+  name: string
+  hostname: string
+  baseImage: {
+    name: string
+  }
 }
 
 function ProfileCard({ profile }: { profile: ProfileWithBaseImage }) {

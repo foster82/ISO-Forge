@@ -2,10 +2,10 @@ import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth-utils'
 import { ArrowLeft, Save, Info, Disc, Server } from 'lucide-react'
 import Link from 'next/link'
-import { redirect } from 'next/navigation'
-import { sha512 } from 'sha512-crypt-ts'
 import YamlEditor from '@/components/YamlEditor'
 import { clsx } from 'clsx'
+
+import { createProfile } from '@/lib/actions/profiles'
 
 export default async function NewProfile({ 
   searchParams 
@@ -18,59 +18,6 @@ export default async function NewProfile({
   const baseImages = await prisma.baseImage.findMany({
     where: { imageType: type, status: 'READY' }
   })
-
-  async function createProfile(formData: FormData) {
-    'use server'
-    await requireAuth()
-    
-    const name = formData.get('name') as string
-    const baseImageId = formData.get('baseImageId') as string
-    const hostname = formData.get('hostname') as string
-    const username = formData.get('username') as string
-    const sshKey = formData.get('sshKey') as string
-    const packagesRaw = formData.get('packages') as string
-    const configYaml = formData.get('configYaml') as string
-    
-    const ipAddress = formData.get('ipAddress') as string
-    const gateway = formData.get('gateway') as string
-    const dnsServers = formData.get('dnsServers') as string
-
-    const passwordMode = formData.get('passwordMode') as string // 'plain' or 'hash'
-    const passwordInput = formData.get('passwordInput') as string
-    
-    let passwordHash = ''
-    
-    if (passwordMode === 'plain') {
-      // Generate SHA-512 crypt hash (Ubuntu standard)
-      passwordHash = sha512.crypt(passwordInput, Math.random().toString(36).substring(2, 10))
-    } else {
-      passwordHash = passwordInput
-    }
-
-    // Parse packages into JSON array
-    const packages = packagesRaw
-      .split(',')
-      .map(p => p.trim())
-      .filter(p => p.length > 0)
-
-    await prisma.profile.create({
-      data: {
-        name,
-        baseImageId,
-        hostname,
-        username,
-        passwordHash,
-        sshKey,
-        packages: JSON.stringify(packages),
-        configYaml: configYaml || null,
-        ipAddress: ipAddress || null,
-        gateway: gateway || null,
-        dnsServers: dnsServers || null
-      }
-    })
-
-    redirect('/')
-  }
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-50">

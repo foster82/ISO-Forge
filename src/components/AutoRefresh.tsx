@@ -11,7 +11,7 @@ export default function AutoRefresh({ enabled }: { enabled: boolean }) {
 
     const interval = setInterval(() => {
       router.refresh()
-    }, 2000)
+    }, 5000)
 
     return () => clearInterval(interval)
   }, [enabled, router])

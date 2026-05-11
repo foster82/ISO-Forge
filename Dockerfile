@@ -1,6 +1,10 @@
 # Stage 1: Build
 FROM node:22-bookworm-slim AS builder
 WORKDIR /app
+
+# Install OpenSSL for Prisma
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+
 COPY package*.json ./
 RUN npm install
 COPY . .
@@ -15,8 +19,11 @@ ENV NODE_ENV=production
 ENV PORT=3000
 
 # Install system dependencies
+# openssl/ca-certificates for prisma and wget
 # linux-image-amd64 is needed for libguestfs appliance
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    openssl \
+    ca-certificates \
     p7zip-full \
     xorriso \
     qemu-system-x86 \

@@ -7,24 +7,23 @@ export const authConfig = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.role = (user as any).role
-        token.username = (user as any).username
-        token.authSource = (user as any).authSource
+        token.role = user.role
+        token.username = user.username
+        token.authSource = user.authSource
       }
       return token
     },
     async session({ session, token }) {
       if (session.user) {
-        (session.user as any).role = token.role as string
-        (session.user as any).username = token.username as string
-        (session.user as any).authSource = token.authSource as string
+        session.user.role = token.role as string
+        session.user.username = token.username as string
+        session.user.authSource = token.authSource as string
       }
       return session
     },
     authorized({ auth, request: { nextUrl } }) {
-      const isLoggedIn = !!auth?.user
       const isSettingsPage = nextUrl.pathname.startsWith("/settings")
-      const role = (auth?.user as any)?.role
+      const role = auth?.user?.role
 
       if (isSettingsPage && role !== "ADMIN") {
         return false // Will redirect to login by default if not authorized, but we might want a custom redirect
@@ -37,4 +36,5 @@ export const authConfig = {
   session: {
     strategy: "jwt",
   },
+  trustHost: true,
 } satisfies NextAuthConfig

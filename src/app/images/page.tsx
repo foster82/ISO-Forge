@@ -1,11 +1,14 @@
 import { prisma } from '@/lib/prisma'
-import { isAdmin, requireAdmin } from '@/lib/auth-utils'
+import { isAdmin } from '@/lib/auth-utils'
 import { Plus, Disc, ArrowLeft, CheckCircle, Clock, XCircle, Globe, Server } from 'lucide-react'
 import Link from 'next/link'
-import { redirect } from 'next/navigation'
-import fs from 'fs'
 import DeleteButton from '@/components/DeleteButton'
 import { clsx } from 'clsx'
+import { deleteImage } from '@/lib/actions/images'
+import AutoRefresh from '@/components/AutoRefresh'
+import DownloadProgressBar from '@/components/DownloadProgressBar'
+
+export const dynamic = 'force-dynamic'
 
 export default async function ImagesList({ 
   searchParams 
@@ -20,34 +23,11 @@ export default async function ImagesList({
     orderBy: { createdAt: 'desc' }
   })
 
-  async function deleteImage(formData: FormData) {
-    'use server'
-    await requireAdmin()
-    const id = formData.get('id') as string
-    const image = await prisma.baseImage.findUnique({ where: { id } })
-    
-    if (image) {
-      // 1. Delete associated profiles and their jobs
-      const profiles = await prisma.profile.findMany({ where: { baseImageId: id } })
-      for (const profile of profiles) {
-        await prisma.buildJob.deleteMany({ where: { profileId: profile.id } })
-      }
-      await prisma.profile.deleteMany({ where: { baseImageId: id } })
-      
-      // 2. Delete the actual file if it exists
-      if (fs.existsSync(image.path)) {
-        fs.unlinkSync(image.path)
-      }
-      
-      // 3. Delete the DB record
-      await prisma.baseImage.delete({ where: { id } })
-    }
-    
-    redirect(`/images?type=${type}`)
-  }
+  const isDownloading = images.some(img => img.status === 'DOWNLOADING')
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-50">
+      <AutoRefresh enabled={isDownloading} />
       <header className="bg-white border-b border-slate-200 px-6 py-4">
         <div className="flex items-center justify-between max-w-6xl mx-auto w-full">
           <div className="flex items-center gap-4">
@@ -153,6 +133,9 @@ export default async function ImagesList({
                           {img.status}
                         </span>
                       </div>
+                      {img.status === 'DOWNLOADING' && (
+                        <DownloadProgressBar imageId={img.id} initialProgress={img.downloadProgress} />
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <p className="text-xs font-mono text-slate-500 truncate max-w-xs">{img.filename}</p>
@@ -166,7 +149,11 @@ export default async function ImagesList({
                     <td className="px-6 py-4 text-right">
                       {isUserAdmin && (
                         <DeleteButton 
-                          action={deleteImage}
+                          action={async (formData) => {
+                            'use server'
+                            const id = formData.get('id') as string
+                            await deleteImage(id, type)
+                          }}
                           id={img.id}
                           confirmMessage="Are you sure? Deleting this image will also delete all associated profiles and build jobs."
                           iconSize={4}

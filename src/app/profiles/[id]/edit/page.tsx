@@ -2,9 +2,10 @@ import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth-utils'
 import { ArrowLeft, Save, Info } from 'lucide-react'
 import Link from 'next/link'
-import { notFound, redirect } from 'next/navigation'
-import { sha512 } from 'sha512-crypt-ts'
+import { notFound } from 'next/navigation'
 import YamlEditor from '@/components/YamlEditor'
+
+import { updateProfile } from '@/lib/actions/profiles'
 
 export default async function EditProfile({ 
   params 
@@ -30,59 +31,7 @@ export default async function EditProfile({
   const packagesList = JSON.parse(profile.packages) as string[]
   const packagesString = packagesList.join(', ')
 
-  async function updateProfile(formData: FormData) {
-    'use server'
-    await requireAuth()
-    
-    const name = formData.get('name') as string
-    const baseImageId = formData.get('baseImageId') as string
-    const hostname = formData.get('hostname') as string
-    const username = formData.get('username') as string
-    const sshKey = formData.get('sshKey') as string
-    const packagesRaw = formData.get('packages') as string
-    const configYaml = formData.get('configYaml') as string
-    
-    const ipAddress = formData.get('ipAddress') as string
-    const gateway = formData.get('gateway') as string
-    const dnsServers = formData.get('dnsServers') as string
-
-    const passwordMode = formData.get('passwordMode') as string // 'plain' or 'hash'
-    const passwordInput = formData.get('passwordInput') as string
-    
-    let passwordHash = profile?.passwordHash || ''
-    
-    if (passwordInput) {
-      if (passwordMode === 'plain') {
-        passwordHash = sha512.crypt(passwordInput, Math.random().toString(36).substring(2, 10))
-      } else {
-        passwordHash = passwordInput
-      }
-    }
-
-    const packages = packagesRaw
-      .split(',')
-      .map(p => p.trim())
-      .filter(p => p.length > 0)
-
-    await prisma.profile.update({
-      where: { id },
-      data: {
-        name,
-        baseImageId,
-        hostname,
-        username,
-        passwordHash,
-        sshKey,
-        packages: JSON.stringify(packages),
-        configYaml: configYaml || null,
-        ipAddress: ipAddress || null,
-        gateway: gateway || null,
-        dnsServers: dnsServers || null
-      }
-    })
-
-    redirect(`/profiles/${id}`)
-  }
+  const updateProfileWithId = updateProfile.bind(null, id)
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-50">
@@ -100,7 +49,7 @@ export default async function EditProfile({
       </header>
 
       <main className="flex-1 max-w-4xl mx-auto w-full p-6">
-        <form action={updateProfile} className="space-y-8">
+        <form action={updateProfileWithId} className="space-y-8">
           {/* Basic Info */}
           <section className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
             <h2 className="text-lg font-semibold text-slate-900 border-b pb-2">Basic Configuration</h2>

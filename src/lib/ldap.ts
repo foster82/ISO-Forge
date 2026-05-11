@@ -8,12 +8,20 @@ export interface LdapConfig {
   filter: string; // e.g. (uid={{username}})
 }
 
-export async function authenticateLDAP(username: string, password: string, config: LdapConfig) {
+export interface LdapUser {
+  id: string;
+  name: string;
+  username: string;
+  email: string;
+  authSource: 'LDAP';
+}
+
+export async function authenticateLDAP(username: string, password: string, config: LdapConfig): Promise<LdapUser | null> {
   const client = ldap.createClient({
     url: config.url,
   });
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const bindAndSearch = (userDn: string) => {
       client.bind(userDn, password, (err) => {
         if (err) {
@@ -36,15 +44,17 @@ export async function authenticateLDAP(username: string, password: string, confi
           }
 
           let found = false;
-          res.on('searchEntry', (entry: any) => {
+          res.on('searchEntry', (entry) => {
             found = true;
-            const user = entry.object;
+            // The object property exists in ldapjs@3 but is missing from @types/ldapjs
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const user = (entry as any).object as { dn: string, displayName?: string, cn?: string, mail?: string };
             client.unbind();
             resolve({
-              id: user.dn as string,
+              id: user.dn,
               name: (user.displayName || user.cn || username) as string,
               username: username,
-              email: user.mail as string,
+              email: (user.mail || '') as string,
               authSource: 'LDAP'
             });
           });
@@ -79,8 +89,8 @@ export async function authenticateLDAP(username: string, password: string, confi
             return resolve(null);
           }
 
-          res.on('searchEntry', (entry: any) => {
-            bindAndSearch(entry.objectName);
+          res.on('searchEntry', (entry) => {
+            bindAndSearch(entry.objectName as string);
           });
 
           res.on('end', () => {

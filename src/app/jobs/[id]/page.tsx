@@ -1,13 +1,15 @@
 import { prisma } from '@/lib/prisma'
-import { isAdmin, requireAdmin, requireAuth } from '@/lib/auth-utils'
-import { ArrowLeft, Clock, CheckCircle, XCircle, Terminal, Download, Play, ShieldCheck } from 'lucide-react'
+import { isAdmin, requireAuth } from '@/lib/auth-utils'
+import { ArrowLeft, Clock, CheckCircle, XCircle, Terminal, Download, ShieldCheck } from 'lucide-react'
 import Link from 'next/link'
-import { notFound, redirect } from 'next/navigation'
-import { QEMURunner } from '@/lib/qemu-runner'
-import fs from 'fs'
+import { notFound } from 'next/navigation'
 import DeleteButton from '@/components/DeleteButton'
 import AutoRefresh from '@/components/AutoRefresh'
 import LogViewer from '@/components/LogViewer'
+import { deleteJob, runBootTest } from '@/lib/actions/jobs'
+import TestBootButton from '@/components/TestBootButton'
+
+export const dynamic = 'force-dynamic'
 
 export default async function JobDetails({ params }: { params: Promise<{ id: string }> }) {
   await requireAuth()
@@ -21,62 +23,14 @@ export default async function JobDetails({ params }: { params: Promise<{ id: str
 
   if (!job) notFound()
 
-  const isJobActive = job.status === 'BUILDING' || job.bootTestStatus === 'RUNNING'
+  const isJobActive = 
+    job.status === 'BUILDING' || 
+    job.status === 'PENDING' || 
+    job.bootTestStatus === 'RUNNING' || 
+    job.bootTestStatus === 'PENDING'
 
-  async function deleteJob() {
-    'use server'
-    await requireAdmin()
-    if (job?.outputPath && fs.existsSync(job.outputPath)) {
-      fs.unlinkSync(job.outputPath)
-    }
-    await prisma.buildJob.delete({ where: { id } })
-    redirect(`/profiles/${job?.profileId}`)
-  }
-
-  async function runBootTest() {
-    'use server'
-    await requireAuth()
-    
-    if (!job?.outputPath) return
-
-    await prisma.buildJob.update({
-      where: { id },
-      data: { 
-        bootTestStatus: 'RUNNING',
-        bootTestLog: 'Initialising QEMU...\n'
-      }
-    })
-
-    // Run test in background
-    QEMURunner.testBoot({
-      imagePath: job.outputPath,
-      imageType: job.profile.baseImage.imageType as 'ISO' | 'CLOUD_IMAGE',
-      onLog: async (msg) => {
-        const currentJob = await prisma.buildJob.findUnique({ where: { id } })
-        await prisma.buildJob.update({
-          where: { id },
-          data: { bootTestLog: (currentJob?.bootTestLog || '') + msg }
-        })
-      }
-    }).then(async (success) => {
-      await prisma.buildJob.update({
-        where: { id },
-        data: { bootTestStatus: success ? 'PASSED' : 'FAILED' }
-      })
-    }).catch(async (error: unknown) => {
-      const currentJob = await prisma.buildJob.findUnique({ where: { id } })
-      const errorMessage = error instanceof Error ? error.message : String(error)
-      await prisma.buildJob.update({
-        where: { id },
-        data: { 
-          bootTestStatus: 'FAILED',
-          bootTestLog: (currentJob?.bootTestLog || '') + `\n[FATAL ERROR] ${errorMessage}`
-        }
-      })
-    })
-
-    redirect(`/jobs/${id}`)
-  }
+  const deleteJobWithId = deleteJob.bind(null, id, `/profiles/${job.profileId}`)
+  const runBootTestWithId = runBootTest.bind(null, id)
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-50">
@@ -96,19 +50,13 @@ export default async function JobDetails({ params }: { params: Promise<{ id: str
           <div className="flex items-center gap-3">
             {isUserAdmin && (
               <DeleteButton 
-                action={deleteJob}
+                action={deleteJobWithId}
                 confirmMessage={`Are you sure you want to delete this build job and its ${job.profile.baseImage.imageType === 'ISO' ? 'ISO' : 'Image'}?`}
               />
             )}
             {job.status === 'COMPLETED' && !job.bootTestStatus && (
-              <form action={runBootTest}>
-                <button 
-                  type="submit"
-                  className="inline-flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-indigo-700 transition-colors shadow-sm"
-                >
-                  <Play className="w-4 h-4 fill-current" />
-                  Test Boot
-                </button>
+              <form action={runBootTestWithId}>
+                <TestBootButton />
               </form>
             )}
             {job.status === 'COMPLETED' && (
@@ -131,10 +79,12 @@ export default async function JobDetails({ params }: { params: Promise<{ id: str
             <div className="flex items-center gap-4">
               <div className={`p-4 rounded-full ${
                 job.status === 'COMPLETED' ? 'bg-emerald-100' :
-                job.status === 'FAILED' ? 'bg-red-100' : 'bg-amber-100 animate-pulse'
+                job.status === 'FAILED' ? 'bg-red-100' :
+                job.status === 'PENDING' ? 'bg-slate-100' : 'bg-amber-100 animate-pulse'
               }`}>
                 {job.status === 'COMPLETED' && <CheckCircle className="w-6 h-6 text-emerald-600" />}
                 {job.status === 'FAILED' && <XCircle className="w-6 h-6 text-red-600" />}
+                {job.status === 'PENDING' && <Clock className="w-6 h-6 text-slate-600" />}
                 {job.status === 'BUILDING' && <Clock className="w-6 h-6 text-amber-600" />}
               </div>
               <div>
@@ -149,10 +99,12 @@ export default async function JobDetails({ params }: { params: Promise<{ id: str
               <div className="flex items-center gap-4">
                 <div className={`p-4 rounded-full ${
                   job.bootTestStatus === 'PASSED' ? 'bg-emerald-100' :
-                  job.bootTestStatus === 'FAILED' ? 'bg-red-100' : 'bg-amber-100 animate-pulse'
+                  job.bootTestStatus === 'FAILED' ? 'bg-red-100' :
+                  job.bootTestStatus === 'PENDING' ? 'bg-slate-100' : 'bg-amber-100 animate-pulse'
                 }`}>
                   {job.bootTestStatus === 'PASSED' && <ShieldCheck className="w-6 h-6 text-emerald-600" />}
                   {job.bootTestStatus === 'FAILED' && <XCircle className="w-6 h-6 text-red-600" />}
+                  {job.bootTestStatus === 'PENDING' && <Clock className="w-6 h-6 text-slate-600" />}
                   {job.bootTestStatus === 'RUNNING' && <Clock className="w-6 h-6 text-amber-600" />}
                 </div>
                 <div>
@@ -161,7 +113,7 @@ export default async function JobDetails({ params }: { params: Promise<{ id: str
                 </div>
               </div>
               {job.bootTestStatus === 'FAILED' && (
-                <form action={runBootTest}>
+                <form action={runBootTestWithId}>
                   <button type="submit" className="text-xs font-semibold text-indigo-600 hover:text-indigo-800">Retry Test</button>
                 </form>
               )}
@@ -172,19 +124,23 @@ export default async function JobDetails({ params }: { params: Promise<{ id: str
         {/* Logs */}
         <div className="grid grid-cols-1 gap-6">
           <LogViewer 
+            jobId={id}
+            logType="build"
             title={`${job.profile.baseImage.imageType === 'ISO' ? 'ISO' : 'Image'} Build Log`} 
             icon={<Terminal className="w-4 h-4 text-slate-400" />}
             content={job.log}
-            isActive={job.status === 'BUILDING'}
+            isActive={job.status === 'BUILDING' || job.status === 'PENDING'}
             variant="emerald"
           />
 
-          {job.bootTestLog && (
+          {(job.bootTestLog || job.bootTestStatus === 'PENDING' || job.bootTestStatus === 'RUNNING') && (
             <LogViewer 
+              jobId={id}
+              logType="boot"
               title="QEMU Serial Console Output" 
               icon={<Terminal className="w-4 h-4 text-slate-400" />}
-              content={job.bootTestLog}
-              isActive={job.bootTestStatus === 'RUNNING'}
+              content={job.bootTestLog || ''}
+              isActive={job.bootTestStatus === 'RUNNING' || job.bootTestStatus === 'PENDING'}
               variant="slate"
             />
           )}

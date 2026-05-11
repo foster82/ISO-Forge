@@ -1,10 +1,25 @@
-import NextAuth from "next-auth"
+import NextAuth, { type DefaultSession } from "next-auth"
 import Credentials from "next-auth/providers/credentials"
 import bcrypt from "bcryptjs"
 import { prisma } from "@/lib/prisma"
 import { getSettings } from "@/lib/settings"
 import { authenticateLDAP } from "@/lib/ldap"
 import { authConfig } from "./auth.config"
+
+declare module "next-auth" {
+  interface User {
+    role?: string
+    username?: string
+    authSource?: string
+  }
+  interface Session {
+    user: {
+      role?: string
+      username?: string
+      authSource?: string
+    } & DefaultSession["user"]
+  }
+}
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
@@ -22,20 +37,27 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const password = credentials.password as string
 
         const settings = await getSettings()
+        console.log(`[AUTH DEBUG] Attempting login for: ${username}, authType: ${settings.authType}`)
 
         // --- 1. Try Local Authentication ---
         if (settings.authType === "LOCAL" || settings.authType === "BOTH") {
           const user = await prisma.user.findUnique({
             where: { username }
           })
-
-          if (user && user.password && await bcrypt.compare(password, user.password)) {
-            return {
-              id: user.id,
-              name: user.name,
-              username: user.username,
-              role: user.role,
-              authSource: 'LOCAL'
+          
+          if (!user) {
+            console.log(`[AUTH DEBUG] User not found: ${username}`)
+          } else {
+            const isMatch = await bcrypt.compare(password, user.password || "")
+            console.log(`[AUTH DEBUG] User found. Password match: ${isMatch}`)
+            if (isMatch) {
+              return {
+                id: user.id,
+                name: user.name,
+                username: user.username,
+                role: user.role,
+                authSource: 'LOCAL'
+              }
             }
           }
         }
@@ -48,7 +70,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             bindDn: settings.ldapBindDn || undefined,
             bindPw: settings.ldapBindPw || undefined,
             filter: settings.ldapFilter || "(uid={{username}})"
-          }) as any
+          })
 
           if (ldapUser) {
             // Check if user exists in local DB to get roles/metadata

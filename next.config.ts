@@ -6,8 +6,9 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: '10GB',
     },
+    // @ts-ignore - property suggested by Next.js error log for middleware-related body limits
+    middlewareClientMaxBodySize: '10GB',
   },
-  /* config options here */
 };
 
 export default nextConfig;

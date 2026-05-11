@@ -51,16 +51,13 @@ export class QEMURunner {
 
         await execAsync(`qemu-img create -f qcow2 "${diskPath}" 10G`)
         
-        // Use if=none and -device for better control
+        // Use a more compatible way to specify CD-ROM and Disk for Q35
         args.push(
-          '-drive', `file=${options.imagePath},format=raw,if=none,id=cdrom,readonly=on`,
-          '-device', 'virtio-blk-pci,drive=cdrom,bootindex=0',
-          '-drive', `file=${diskPath},format=qcow2,if=none,id=hd0`,
-          '-device', 'virtio-blk-pci,drive=hd0,bootindex=1'
+          '-drive', `file=${options.imagePath},media=cdrom,readonly=on,index=0`,
+          '-drive', `file=${diskPath},format=qcow2,if=virtio,index=1`
         )
       } else {
         // Cloud Images: Many Ubuntu cloud images are hybrid, but let's try UEFI first if available
-        // as modern GPT images often prefer it.
         if (hasUefi) {
           args.push('-bios', ovmfPath)
           await options.onLog('UEFI firmware (OVMF) enabled for Cloud Image boot.\n')
@@ -90,10 +87,12 @@ export class QEMURunner {
         args.push('-enable-kvm', '-cpu', 'host')
         await options.onLog('KVM acceleration enabled.\n')
       } catch {
-        args.push('-cpu', 'max') // Use 'max' for better emulation performance
+        // Use 'max' for better emulation performance, but some systems prefer 'qemu64'
+        args.push('-cpu', 'max') 
         await options.onLog('KVM not available, running with software emulation (slower) using CPU "max".\n')
       }
 
+      await options.onLog(`Starting QEMU process: /usr/bin/qemu-system-x86_64 ${args.join(' ')}\n`)
       const qemu = spawn('/usr/bin/qemu-system-x86_64', args)
 
       let isSuccess = false
@@ -123,17 +122,19 @@ export class QEMURunner {
             cleanOutput.includes('subiquity/Success/SUCCESS') ||
             cleanOutput.includes('Installation complete!') ||
             cleanOutput.includes('REBOOTING') ||
-            // Early "Bootable" indicators
+            // Early "Bootable" indicators (helpful if full install takes too long)
             cleanOutput.includes('Using CD-ROM mount point') ||
             cleanOutput.includes('Scanning disc for index files') ||
             cleanOutput.includes('Linux version') ||
-            (cleanOutput.includes('cloud-init') && cleanOutput.includes('modules:config'))
+            cleanOutput.includes('Kernel command line') ||
+            (cleanOutput.includes('cloud-init') && cleanOutput.includes('modules:config')) ||
+            cleanOutput.includes('Begin: Loading essential drivers')
 
           if (isFinished) {
             clearTimeout(timer)
             isSuccess = true
             qemu.kill('SIGKILL')
-            await options.onLog('\n[SUCCESS] Boot indicator detected!')
+            await options.onLog('\n[SUCCESS] Boot indicator detected! ' + (cleanOutput.includes('login:') ? '(Reached login prompt)' : '(Reached kernel/installer stage)'))
             resolve(true)
           }
         })

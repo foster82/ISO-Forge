@@ -11,4 +11,15 @@ services:
       - DATABASE_URL=file:/app/data/iso-forge.db
       - AUTH_SECRET=CXs95ZP0G3Xm7lnFCwX/++zbE2/CM0zOkrWFlatEn90=
       - NEXTAUTH_URL=http://localhost:3000
+      - REDIS_URL=redis://redis:6379
+    user: root
+    # devices:
+    #   - "/dev/kvm:/dev/kvm"
+    restart: unless-stopped
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:alpine
+    container_name: iso-forge-redis
     restart: unless-stopped
