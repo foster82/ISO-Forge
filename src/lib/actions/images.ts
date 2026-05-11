@@ -4,12 +4,18 @@ import { prisma } from '@/lib/prisma'
 import { requireAdmin, isAdmin } from '@/lib/auth-utils'
 import { redirect } from 'next/navigation'
 import { DownloadEngine } from '@/lib/download-engine'
+import { SourceEngine } from '@/lib/source-engine'
 import { logEvents } from '@/lib/events'
 import path from 'path'
 import fs from 'fs/promises'
 import fsSync from 'fs'
 import { Readable } from 'stream'
 import { pipeline } from 'stream/promises'
+
+export async function getSourcedImages(type: 'ISO' | 'CLOUD_IMAGE') {
+  await requireAdmin()
+  return await SourceEngine.getAllImages(type)
+}
 
 export async function addNewImage(formData: FormData) {
   let imageType = 'ISO'
@@ -24,6 +30,7 @@ export async function addNewImage(formData: FormData) {
     
     const name = formData.get('name') as string
     const version = formData.get('version') as string
+    const arch = formData.get('arch') as string || 'amd64'
     imageType = formData.get('imageType') as string || 'ISO'
     const source = formData.get('source') as string
     
@@ -31,7 +38,7 @@ export async function addNewImage(formData: FormData) {
       return { error: 'OS Name and Version are required.' }
     }
 
-    console.log(`Adding new image: ${name} v${version} (${imageType}) from ${source}`)
+    console.log(`Adding new image: ${name} v${version} (${imageType}) [${arch}] from ${source}`)
 
     let filename = ''
     let absolutePath = ''
@@ -55,6 +62,7 @@ export async function addNewImage(formData: FormData) {
         data: {
           name,
           version,
+          arch,
           filename,
           path: absolutePath,
           imageType,
@@ -100,6 +108,7 @@ export async function addNewImage(formData: FormData) {
         data: {
           name,
           version,
+          arch,
           filename,
           path: absolutePath,
           imageType,
@@ -110,7 +119,8 @@ export async function addNewImage(formData: FormData) {
       try {
         const fileStream = file.stream()
         const writeStream = fsSync.createWriteStream(absolutePath)
-        await pipeline(Readable.fromWeb(fileStream as any), writeStream)
+        // @ts-expect-error - ReadableStream from web is slightly different than node stream/web expectation in some environments
+        await pipeline(Readable.fromWeb(fileStream), writeStream)
         
         const stats = await fs.stat(absolutePath)
         console.log(`Verified file size on disk: ${stats.size} bytes`)
@@ -128,15 +138,18 @@ export async function addNewImage(formData: FormData) {
         return { error: `Failed to write file to disk: ${error instanceof Error ? error.message : String(error)}` }
       }
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Re-throw redirect errors so Next.js handles them
-    if (error?.message === 'NEXT_REDIRECT' || error?.digest?.includes('NEXT_REDIRECT')) {
+    const isRedirectError = error instanceof Error && 
+      (error.message === 'NEXT_REDIRECT' || (error as { digest?: string }).digest?.includes('NEXT_REDIRECT'))
+
+    if (isRedirectError) {
       throw error
     }
     
     console.error('addNewImage action caught critical error:', error)
     // Return a safe error message to the client
-    const errorMessage = error?.message || 'An unexpected error occurred'
+    const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred'
     return { error: `Server error: ${errorMessage}` }
   }
 

@@ -9,6 +9,7 @@ const execAsync = promisify(exec)
 export interface TestOptions {
   imagePath: string
   imageType: 'ISO' | 'CLOUD_IMAGE'
+  arch?: string // 'amd64' or 'arm64'
   onLog: (message: string) => Promise<void>
   timeoutMs?: number
 }
@@ -18,15 +19,19 @@ export class QEMURunner {
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'qemu-test-'))
     const diskPath = path.join(tempDir, 'test-disk.qcow2')
     const timeout = options.timeoutMs || 900000 // 15 minutes default
+    const arch = options.arch || 'amd64'
     
     try {
-      await options.onLog('Initializing QEMU test environment...')
+      await options.onLog(`Initializing QEMU test environment for ${arch}...`)
       
+      const qemuBinary = arch === 'arm64' ? '/usr/bin/qemu-system-aarch64' : '/usr/bin/qemu-system-x86_64'
+      const machineType = arch === 'arm64' ? 'virt' : 'q35'
+
       const args = [
         '-nographic',
         '-m', '4096',
         '-smp', '2',
-        '-machine', 'q35',
+        '-machine', machineType,
         '-netdev', 'user,id=net0',
         '-device', 'virtio-net-pci,netdev=net0',
         '-monitor', 'none',
@@ -34,36 +39,53 @@ export class QEMURunner {
         '-serial', 'stdio'
       ]
 
-      // Check for UEFI firmware
-      const ovmfPath = '/usr/share/ovmf/OVMF.fd'
-      let hasUefi = false
-      try {
-        await fs.access(ovmfPath)
-        hasUefi = true
-      } catch {}
+      if (arch === 'arm64') {
+        // arm64/virt needs highmem off sometimes for older kernels, but let's try default
+        // It also MUST use UEFI (AAVMF)
+        const aavmfPath = '/usr/share/AAVMF/AAVMF_CODE.fd'
+        
+        try {
+          await fs.access(aavmfPath)
+          args.push('-drive', `if=pflash,format=raw,unit=0,file=${aavmfPath},readonly=on`)
+          // We don't necessarily need vars for a simple boot test, but it's good practice
+          await options.onLog('ARM64 UEFI firmware (AAVMF) enabled.\n')
+        } catch {
+          await options.onLog('WARNING: AAVMF firmware not found. ARM64 boot may fail. Please install qemu-efi-aarch64.\n')
+        }
+      } else {
+        // Check for UEFI firmware (x86)
+        const ovmfPath = '/usr/share/ovmf/OVMF.fd'
+        let hasUefi = false
+        try {
+          await fs.access(ovmfPath)
+          hasUefi = true
+        } catch {}
+
+        if (hasUefi) {
+          args.push('-bios', ovmfPath)
+          await options.onLog('UEFI firmware (OVMF) enabled.\n')
+        }
+      }
 
       if (options.imageType === 'ISO') {
-        // ISOs usually boot fine with BIOS, but we can use UEFI if available
-        if (hasUefi) {
-          args.push('-bios', ovmfPath)
-          await options.onLog('UEFI firmware (OVMF) enabled for ISO boot.\n')
-        }
-
         await execAsync(`qemu-img create -f qcow2 "${diskPath}" 10G`)
         
-        // Use a more compatible way to specify CD-ROM and Disk for Q35
-        args.push(
-          '-drive', `file=${options.imagePath},media=cdrom,readonly=on,index=0`,
-          '-drive', `file=${diskPath},format=qcow2,if=virtio,index=1`
-        )
-      } else {
-        // Cloud Images: Many Ubuntu cloud images are hybrid, but let's try UEFI first if available
-        if (hasUefi) {
-          args.push('-bios', ovmfPath)
-          await options.onLog('UEFI firmware (OVMF) enabled for Cloud Image boot.\n')
+        if (arch === 'arm64') {
+          args.push(
+            '-device', 'virtio-blk-pci,drive=drive0,id=virtblk0',
+            '-drive', `file=${diskPath},format=qcow2,if=none,id=drive0`,
+            '-device', 'virtio-scsi-pci,id=scsi0',
+            '-device', 'scsi-cd,drive=drive1,id=virtcd0',
+            '-drive', `file=${options.imagePath},media=cdrom,readonly=on,if=none,id=drive1`
+          )
+        } else {
+          args.push(
+            '-drive', `file=${options.imagePath},media=cdrom,readonly=on,index=0`,
+            '-drive', `file=${diskPath},format=qcow2,if=virtio,index=1`
+          )
         }
-
-        // Detect format more reliably
+      } else {
+        // Cloud Images
         let format = 'raw'
         try {
           const { stdout } = await execAsync(`qemu-img info "${options.imagePath}" --output=json`)
@@ -81,19 +103,25 @@ export class QEMURunner {
         )
       }
 
-      // Enable KVM if available for much faster tests
+      // Enable KVM if available
       try {
         await execAsync('test -e /dev/kvm')
-        args.push('-enable-kvm', '-cpu', 'host')
-        await options.onLog('KVM acceleration enabled.\n')
+        // Only use KVM if host arch matches guest arch
+        const hostArch = os.arch() === 'x64' ? 'amd64' : (os.arch() === 'arm64' ? 'arm64' : os.arch())
+        if (hostArch === arch) {
+          args.push('-enable-kvm', '-cpu', 'host')
+          await options.onLog('KVM acceleration enabled.\n')
+        } else {
+          args.push('-cpu', 'max')
+          await options.onLog(`KVM not available for cross-arch (Host: ${hostArch}, Guest: ${arch}). Using software emulation.\n`)
+        }
       } catch {
-        // Use 'max' for better emulation performance, but some systems prefer 'qemu64'
         args.push('-cpu', 'max') 
-        await options.onLog('KVM not available, running with software emulation (slower) using CPU "max".\n')
+        await options.onLog('KVM not available, running with software emulation.\n')
       }
 
-      await options.onLog(`Starting QEMU process: /usr/bin/qemu-system-x86_64 ${args.join(' ')}\n`)
-      const qemu = spawn('/usr/bin/qemu-system-x86_64', args)
+      await options.onLog(`Starting QEMU process: ${qemuBinary} ${args.join(' ')}\n`)
+      const qemu = spawn(qemuBinary, args)
 
       let isSuccess = false
       let output = ''
@@ -116,8 +144,12 @@ export class QEMURunner {
           // Look for success indicators in the serial output
           const isFinished = 
             // Final success indicators
-            cleanOutput.includes('login:') || 
-            cleanOutput.includes('Welcome to Ubuntu') || 
+            cleanOutput.includes('login:') ||
+            cleanOutput.includes('Welcome to Ubuntu') ||
+            cleanOutput.includes('Welcome to Alpine Linux') ||
+            cleanOutput.includes('Fedora') ||
+            cleanOutput.includes('Rocky Linux') ||
+            cleanOutput.includes('AlmaLinux') ||
             (cleanOutput.includes('Cloud-init') && cleanOutput.includes('finished')) ||
             cleanOutput.includes('subiquity/Success/SUCCESS') ||
             cleanOutput.includes('Installation complete!') ||

@@ -1,17 +1,68 @@
 'use client'
 
-import { useState } from 'react'
-import { Download, Upload, Info } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Download, Upload, Info, Globe } from 'lucide-react'
 import Link from 'next/link'
+
+interface SourcedImage {
+  name: string
+  version: string
+  arch: 'amd64' | 'arm64'
+  url: string
+  filename: string
+  imageType: 'ISO' | 'CLOUD_IMAGE'
+  os: 'Ubuntu' | 'Debian' | 'Fedora' | 'Alpine' | 'Rocky' | 'Alma'
+}
 
 interface NewImageFormProps {
   type: string
   addNewImage: (formData: FormData) => Promise<{ error?: string } | void>
+  getSourcedImages: (type: 'ISO' | 'CLOUD_IMAGE') => Promise<SourcedImage[]>
 }
 
-export default function NewImageForm({ type, addNewImage }: NewImageFormProps) {
-  const [source, setSource] = useState<'url' | 'upload'>('url')
+export default function NewImageForm({ type, addNewImage, getSourcedImages }: NewImageFormProps) {
+  const [source, setSource] = useState<'url' | 'upload' | 'library'>('library')
   const [isUploading, setIsUploading] = useState(false)
+  const [sourcedImages, setSourcedImages] = useState<SourcedImage[]>([])
+  const [isLoadingLibrary, setIsLoadingLibrary] = useState(false)
+  const [imageType, setImageType] = useState(type)
+
+  const [formDataState, setFormDataState] = useState({
+    name: '',
+    version: '',
+    url: '',
+    arch: 'amd64'
+  })
+
+  useEffect(() => {
+    async function loadLibrary() {
+      setIsLoadingLibrary(true)
+      try {
+        const images = await getSourcedImages(imageType as 'ISO' | 'CLOUD_IMAGE')
+        setSourcedImages(images)
+      } catch (error) {
+        console.error('Failed to load library:', error)
+      } finally {
+        setIsLoadingLibrary(false)
+      }
+    }
+
+    if (source === 'library') {
+      loadLibrary()
+    }
+  }, [source, imageType, getSourcedImages])
+
+  const handleLibrarySelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selected = sourcedImages.find(img => img.url === e.target.value)
+    if (selected) {
+      setFormDataState({
+        name: selected.name,
+        version: selected.version,
+        url: selected.url,
+        arch: selected.arch
+      })
+    }
+  }
 
   const handleSubmit = async (formData: FormData) => {
     console.log('Form submission started...')
@@ -27,15 +78,19 @@ export default function NewImageForm({ type, addNewImage }: NewImageFormProps) {
       }
 
       console.log('Action completed successfully')
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Check if it's a redirect error (standard in Next.js server actions)
-      if (error?.message === 'NEXT_REDIRECT' || error?.digest?.includes('NEXT_REDIRECT')) {
+      const isRedirectError = error instanceof Error && 
+        (error.message === 'NEXT_REDIRECT' || (error as { digest?: string }).digest?.includes('NEXT_REDIRECT'))
+
+      if (isRedirectError) {
         console.log('Redirecting...')
         return
       }
 
       console.error('Upload failed with caught error:', error)
-      alert(`Upload failed: ${error.message || 'Unknown error'}`)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      alert(`Upload failed: ${errorMessage}`)
       setIsUploading(false)
     }
   }
@@ -51,17 +106,31 @@ export default function NewImageForm({ type, addNewImage }: NewImageFormProps) {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="space-y-2">
             <label className="text-sm font-medium text-slate-700">Image Type</label>
             <select 
               name="imageType" 
               required
-              defaultValue={type}
+              value={imageType}
+              onChange={(e) => setImageType(e.target.value)}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white"
             >
               <option value="ISO">ISO (Installer)</option>
               <option value="CLOUD_IMAGE">Cloud Image (QCOW2/IMG)</option>
+            </select>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-slate-700">Architecture</label>
+            <select 
+              name="arch" 
+              required
+              value={formDataState.arch}
+              onChange={(e) => setFormDataState({ ...formDataState, arch: e.target.value })}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white"
+            >
+              <option value="amd64">amd64 (x86_64)</option>
+              <option value="arm64">arm64 (AArch64)</option>
             </select>
           </div>
           <div className="space-y-2">
@@ -70,6 +139,8 @@ export default function NewImageForm({ type, addNewImage }: NewImageFormProps) {
               name="name" 
               type="text" 
               required 
+              value={formDataState.name}
+              onChange={(e) => setFormDataState({ ...formDataState, name: e.target.value })}
               placeholder="e.g. Debian 12 / Ubuntu 22.04"
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
             />
@@ -78,7 +149,17 @@ export default function NewImageForm({ type, addNewImage }: NewImageFormProps) {
 
         <div className="space-y-4">
           <label className="text-sm font-medium text-slate-700">Image Source</label>
-          <div className="flex gap-4 p-1 bg-slate-100 rounded-lg w-fit">
+          <div className="flex flex-wrap gap-4 p-1 bg-slate-100 rounded-lg w-fit">
+            <button
+              type="button"
+              onClick={() => setSource('library')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all text-sm font-medium ${
+                source === 'library' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Globe className="w-4 h-4" />
+              Official Library
+            </button>
             <button
               type="button"
               onClick={() => setSource('url')}
@@ -87,7 +168,7 @@ export default function NewImageForm({ type, addNewImage }: NewImageFormProps) {
               }`}
             >
               <Download className="w-4 h-4" />
-              Download URL
+              Direct URL
             </button>
             <button
               type="button"
@@ -101,7 +182,7 @@ export default function NewImageForm({ type, addNewImage }: NewImageFormProps) {
             </button>
           </div>
           {/* Hidden input to ensure 'source' value is submitted */}
-          <input type="hidden" name="source" value={source} />
+          <input type="hidden" name="source" value={source === 'library' ? 'url' : source} />
         </div>
 
         <div className="space-y-6">
@@ -112,23 +193,48 @@ export default function NewImageForm({ type, addNewImage }: NewImageFormProps) {
                 name="version" 
                 type="text" 
                 required 
+                value={formDataState.version}
+                onChange={(e) => setFormDataState({ ...formDataState, version: e.target.value })}
                 placeholder="e.g. 12.5.0"
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
               />
             </div>
             
-            {source === 'url' ? (
+            {source === 'library' && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">Select Official Release</label>
+                <select 
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white"
+                  onChange={handleLibrarySelect}
+                  value={formDataState.url}
+                  disabled={isLoadingLibrary}
+                >
+                  <option value="">{isLoadingLibrary ? 'Loading library...' : '-- Select an image --'}</option>
+                  {sourcedImages.map(img => (
+                    <option key={img.url} value={img.url}>{img.os} - {img.name}</option>
+                  ))}
+                </select>
+                {/* Hidden input to ensure 'url' value is submitted for library source */}
+                <input type="hidden" name="url" value={formDataState.url} />
+              </div>
+            )}
+
+            {source === 'url' && (
               <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-700">Direct Download URL</label>
                 <input 
                   name="url" 
                   type="url" 
                   required
+                  value={formDataState.url}
+                  onChange={(e) => setFormDataState({ ...formDataState, url: e.target.value })}
                   placeholder="https://cdimage.debian.org/.../debian-12.5.0-amd64-netinst.iso"
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
                 />
               </div>
-            ) : (
+            )}
+
+            {source === 'upload' && (
               <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-700">Select File</label>
                 <input 

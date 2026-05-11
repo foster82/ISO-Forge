@@ -1,7 +1,7 @@
 import { requireAdmin } from '@/lib/auth-utils'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
-import { addNewImage } from '@/lib/actions/images'
+import { addNewImage, getSourcedImages } from '@/lib/actions/images'
 import NewImageForm from '@/components/NewImageForm'
 
 export default async function NewImage({ 
@@ -26,7 +26,11 @@ export default async function NewImage({
       </header>
 
       <main className="flex-1 max-w-4xl mx-auto w-full p-6">
-        <NewImageForm type={type} addNewImage={addNewImage} />
+        <NewImageForm 
+          type={type} 
+          addNewImage={addNewImage} 
+          getSourcedImages={getSourcedImages} 
+        />
       </main>
     </div>
   )

@@ -8,6 +8,8 @@ ISO Forge is a full-stack Next.js application designed to automate the customiza
 - **Cloud Image Injection:** Pre-configure Cloud Images (QCOW2/IMG) using `virt-customize`.
 - **Profile Management:** Create, edit, and manage multiple OS configuration profiles.
 - **Automated Boot Testing:** Integrated QEMU runner to verify that your customized images boot successfully in a virtual environment (KVM accelerated).
+- **REST API (v1):** Programmatic access to images, profiles, and job statuses.
+- **CLI Support:** A dedicated helper script for managing builds from the terminal.
 - **Authentication:** Secure login supporting both **Local Database** accounts and **LDAP/Active Directory** integration.
 - **Role-Based Access Control (RBAC):** Granular permissions to restrict sensitive administrative actions.
 - **Custom Branding:** Global settings to configure company name and logo across the application.
@@ -37,6 +39,10 @@ ISO Forge implements two primary roles to ensure system security:
 - **Database:** [Prisma](https://prisma.io) with SQLite (Better-SQLite3 adapter)
 - **Styling:** [Tailwind CSS 4](https://tailwindcss.com) & [Lucide React](https://lucide.dev)
 - **Backend Tools:** `xorriso`, `7z`, `qemu-system-x86_64`, `virt-customize` (libguestfs)
+
+## 📖 Documentation
+
+- **[REST API & CLI Guide](./API.md):** Detailed instructions on how to use the API and the included CLI helper script.
 
 ## 🐳 Docker Deployment (Recommended)
 
