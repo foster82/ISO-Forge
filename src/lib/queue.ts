@@ -22,6 +22,11 @@ export const setupWorkers = () => {
   buildQueue.add('cleanup', { type: 'cleanup' }, {
     repeat: { pattern: '0 * * * *' }
   }).catch(e => console.error('Failed to schedule cleanup job:', e))
+
+  // Schedule base image sync (every 12 hours)
+  buildQueue.add('sync-images', { type: 'sync-images' }, {
+    repeat: { pattern: '0 */12 * * *' }
+  }).catch(e => console.error('Failed to schedule sync job:', e))
   
   const worker = new Worker(
     'build-queue',
@@ -35,6 +40,8 @@ export const setupWorkers = () => {
         await handleBootTestJob(jobId, payload)
       } else if (type === 'cleanup') {
         await handleCleanupJob()
+      } else if (type === 'sync-images') {
+        await handleSyncImagesJob()
       }
     },
     { 
@@ -105,6 +112,30 @@ async function handleCleanupJob() {
         }
         await prisma.buildJob.delete({ where: { id: job.id } })
       }
+    }
+  }
+}
+
+import { SourceEngine } from './source-engine'
+
+async function handleSyncImagesJob() {
+  console.log('[SYNC-WORKER] Checking for base image updates...')
+  const images = await prisma.baseImage.findMany()
+  
+  for (const image of images) {
+    try {
+      const upstream = await SourceEngine.findBestMatch(image)
+      if (upstream) {
+        await prisma.baseImage.update({
+          where: { id: image.id },
+          data: {
+            upstreamVersion: upstream.version,
+            upstreamUrl: upstream.url
+          }
+        })
+      }
+    } catch (e) {
+      console.error(`[SYNC-WORKER] Failed to sync ${image.name}:`, e)
     }
   }
 }

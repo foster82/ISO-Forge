@@ -308,4 +308,17 @@ export class SourceEngine {
     ])
     return [...ubuntu, ...debian, ...fedora, ...alpine, ...rocky, ...alma]
   }
+
+  static async findBestMatch(baseImage: { name: string, arch: string, imageType: string }): Promise<SourcedImage | null> {
+    const sourced = await this.getAllImages(baseImage.imageType as any)
+    
+    // Simple heuristic: matching name (partial) and exact arch
+    // e.g. "Ubuntu 24.04" in "Ubuntu Server 24.04.1 (amd64)"
+    const match = sourced.find(s => 
+      baseImage.name.toLowerCase().includes(s.os.toLowerCase()) && 
+      s.arch === baseImage.arch
+    )
+    
+    return match || null
+  }
 }

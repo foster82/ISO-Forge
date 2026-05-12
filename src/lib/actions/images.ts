@@ -178,8 +178,43 @@ export async function deleteImage(id: string, type: string) {
     if (fsSync.existsSync(image.path)) {
       try { fsSync.unlinkSync(image.path) } catch (e) {}
     }
-    await prisma.baseImage.delete({ where: { id } })
+    await prisma.baseImage.delete({ where: { id: image.id } })
   }
   revalidatePath('/images')
   redirect(`/images?type=${type}`)
+}
+
+export async function syncBaseImagesAction() {
+  await requireAdmin()
+  const images = await prisma.baseImage.findMany()
+  let updateCount = 0
+
+  for (const image of images) {
+    const upstream = await SourceEngine.findBestMatch(image)
+    if (upstream) {
+      const needsUpdate = upstream.version !== image.version
+      
+      await prisma.baseImage.update({
+        where: { id: image.id },
+        data: {
+          upstreamVersion: upstream.version,
+          upstreamUrl: upstream.url
+        }
+      })
+      
+      if (needsUpdate) updateCount++
+    }
+  }
+
+  revalidatePath('/images')
+  return { success: true, updatesFound: updateCount }
+}
+
+export async function toggleAutoUpdateAction(id: string, enabled: boolean) {
+  await requireAdmin()
+  await prisma.baseImage.update({
+    where: { id },
+    data: { autoUpdate: enabled }
+  })
+  revalidatePath('/images')
 }

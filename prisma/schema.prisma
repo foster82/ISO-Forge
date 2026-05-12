@@ -18,6 +18,9 @@ model BaseImage {
   status          String     @default("READY") // READY, DOWNLOADING, FAILED
   downloadUrl     String?
   downloadProgress Float     @default(0) // Percentage 0-100
+  upstreamVersion  String?    // Latest version from mirror
+  upstreamUrl      String?    // Latest download URL from mirror
+  autoUpdate       Boolean    @default(false) // Automatically download new versions
   createdAt       DateTime   @default(now())
   profiles        Profile[]
 }

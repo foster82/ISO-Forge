@@ -1,10 +1,10 @@
 import { prisma } from '@/lib/prisma'
 import { isAdmin } from '@/lib/auth-utils'
-import { Plus, Disc, ArrowLeft, CheckCircle, Clock, XCircle, Globe, Server } from 'lucide-react'
+import { Plus, Disc, ArrowLeft, CheckCircle, Clock, XCircle, Globe, Server, RefreshCw, Zap } from 'lucide-react'
 import Link from 'next/link'
 import DeleteButton from '@/components/DeleteButton'
 import { clsx } from 'clsx'
-import { deleteImage } from '@/lib/actions/images'
+import { deleteImage, syncBaseImagesAction, toggleAutoUpdateAction } from '@/lib/actions/images'
 import AutoRefresh from '@/components/AutoRefresh'
 import DownloadProgressBar from '@/components/DownloadProgressBar'
 import fs from 'fs'
@@ -52,17 +52,28 @@ export default async function ImagesList({
               <ArrowLeft className="w-5 h-5 text-slate-600" />
             </Link>
             <h1 className="text-xl font-bold text-slate-900">Base Image Manager</h1>
-          </div>
-          {isUserAdmin && (
-            <Link 
-              href={`/images/new?type=${type}`} 
-              className="inline-flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-indigo-700 transition-colors shadow-sm"
-            >
-              <Plus className="w-4 h-4" />
-              Add {type === 'ISO' ? 'ISO' : 'Cloud Image'}
-            </Link>
-          )}
-        </div>
+            </div>
+            {isUserAdmin && (
+            <div className="flex items-center gap-3">
+              <form action={async () => { 'use server'; await syncBaseImagesAction(); }}>
+                <button 
+                  type="submit"
+                  className="inline-flex items-center gap-2 bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg font-medium hover:bg-slate-50 transition-colors shadow-sm text-sm"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Sync Mirrors
+                </button>
+              </form>
+              <Link 
+                href={`/images/new?type=${type}`} 
+                className="inline-flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-indigo-700 transition-colors shadow-sm text-sm"
+              >
+                <Plus className="w-4 h-4" />
+                Add {type === 'ISO' ? 'ISO' : 'Cloud Image'}
+              </Link>
+            </div>
+            )}
+            </div>
       </header>
 
       <main className="flex-1 max-w-6xl mx-auto w-full p-6 space-y-6">
@@ -172,7 +183,15 @@ export default async function ImagesList({
                           )}
                         </div>
                         <div>
-                          <p className="font-bold text-slate-900">{img.name}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-bold text-slate-900">{img.name}</p>
+                            {img.upstreamVersion && img.upstreamVersion !== img.version && (
+                              <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-bold rounded flex items-center gap-1">
+                                <Zap className="w-3 h-3" />
+                                v{img.upstreamVersion} Available
+                              </span>
+                            )}
+                          </div>
                           <p className="text-xs text-slate-500">v{img.version}</p>
                         </div>
                       </div>
@@ -213,18 +232,34 @@ export default async function ImagesList({
                       )}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      {isUserAdmin && (
-                        <DeleteButton 
-                          action={async (formData) => {
-                            'use server'
-                            const id = formData.get('id') as string
-                            await deleteImage(id, type)
-                          }}
-                          id={img.id}
-                          confirmMessage="Are you sure? Deleting this image will also delete all associated profiles and build jobs."
-                          iconSize={4}
-                        />
-                      )}
+                      <div className="flex justify-end items-center gap-2">
+                        {isUserAdmin && (
+                          <>
+                            <form action={async () => { 'use server'; await toggleAutoUpdateAction(img.id, !img.autoUpdate); }}>
+                              <button 
+                                type="submit" 
+                                title={img.autoUpdate ? "Auto-update enabled" : "Enable Auto-update"}
+                                className={clsx(
+                                  "p-2 rounded-lg transition-all",
+                                  img.autoUpdate ? "text-indigo-600 bg-indigo-50" : "text-slate-400 hover:bg-slate-50"
+                                )}
+                              >
+                                <RefreshCw className={clsx("w-4 h-4", img.autoUpdate && "animate-spin-slow")} />
+                              </button>
+                            </form>
+                            <DeleteButton 
+                              action={async (formData) => {
+                                'use server'
+                                const id = formData.get('id') as string
+                                await deleteImage(id, type)
+                              }}
+                              id={img.id}
+                              confirmMessage="Are you sure? Deleting this image will also delete all associated profiles and build jobs."
+                              iconSize={4}
+                            />
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))
