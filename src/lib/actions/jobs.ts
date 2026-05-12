@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation'
 import fsSync from 'fs'
 import { buildQueue } from '@/lib/queue'
 import { revalidatePath } from 'next/cache'
+import { auditLog } from '@/lib/audit'
 
 export async function deleteJob(id: string, redirectPath?: string, _formData?: FormData) {
   await requireAdmin()
@@ -15,6 +16,7 @@ export async function deleteJob(id: string, redirectPath?: string, _formData?: F
   })
   
   if (job) {
+    await auditLog('BUILD_DELETE', { resourceId: id, resourceName: `Job for ${job.profile.name}` })
     if (job.outputPath && fsSync.existsSync(job.outputPath)) {
       try {
         fsSync.unlinkSync(job.outputPath)
@@ -157,6 +159,8 @@ export async function cleanupJobs(type: 'FAILED' | 'ALL' | 'OLD') {
     await prisma.buildJob.delete({ where: { id: job.id } })
     count++
   }
+
+  await auditLog('CLEANUP_RUN', { details: { type, count } })
 
   revalidatePath('/')
   revalidatePath('/jobs')

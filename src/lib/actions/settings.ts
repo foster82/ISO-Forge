@@ -5,6 +5,7 @@ import { requireAdmin } from '@/lib/auth-utils'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { testLDAP } from '@/lib/ldap'
+import { auditLog } from '@/lib/audit'
 
 export async function testLdapConnection(formData: FormData) {
   await requireAdmin()
@@ -52,6 +53,8 @@ export async function updateSettings(formData: FormData) {
     where: { id: 'default' },
     data
   })
+
+  await auditLog('SETTINGS_UPDATE', { details: Object.keys(data) })
 
   revalidatePath('/')
   revalidatePath('/settings')

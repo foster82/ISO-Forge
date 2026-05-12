@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { RedfishEngine } from '@/lib/redfish-engine'
 import crypto from 'crypto'
+import { auditLog, AuditAction } from '@/lib/audit'
 
 export async function createBareMetalProvider(formData: FormData) {
   await requireAdmin()
@@ -25,6 +26,10 @@ export async function createBareMetalProvider(formData: FormData) {
 
 export async function deleteBareMetalProvider(id: string) {
   await requireAdmin()
+  const provider = await prisma.bareMetalProvider.findUnique({ where: { id } })
+  if (provider) {
+    await auditLog('BM_DELETE', { resourceId: id, resourceName: provider.name })
+  }
   await prisma.bareMetalProvider.delete({ where: { id } })
   revalidatePath('/settings')
 }
@@ -60,6 +65,12 @@ export async function deployToBareMetal(jobId: string, providerId: string, force
   console.log(`[BARE-METAL] Deploying job ${jobId} to ${provider.name} (${provider.managementIp})`)
   console.log(`[BARE-METAL] VMedia URL: ${isoUrl}`)
 
+  await auditLog('BM_DEPLOY', { 
+    resourceId: providerId, 
+    resourceName: provider.name,
+    details: { jobId, forceReboot }
+  })
+
   // 3. Trigger Redfish Mount
   const mountResult = await RedfishEngine.mountIso(provider, isoUrl)
   if (!mountResult.success) return mountResult
@@ -87,6 +98,13 @@ export async function controlServerPowerAction(id: string, action: 'On' | 'Force
   await requireAdmin()
   const provider = await prisma.bareMetalProvider.findUnique({ where: { id } })
   if (!provider) return { success: false, message: 'Provider not found' }
+
+  const auditMap: Record<string, AuditAction> = {
+    'On': 'BM_POWER_ON',
+    'ForceOff': 'BM_POWER_OFF',
+    'ForceRestart': 'BM_REBOOT'
+  }
+  await auditLog(auditMap[action] || 'BM_REBOOT', { resourceId: id, resourceName: provider.name })
 
   return await RedfishEngine.powerAction(provider, action)
 }

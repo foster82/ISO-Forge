@@ -149,6 +149,17 @@ model VirtualMediaToken {
   createdAt DateTime @default(now())
 }
 
+model AuditLog {
+  id           String   @id @default(cuid())
+  timestamp    DateTime @default(now())
+  userId       String?
+  username     String?
+  action       String   // e.g. PROFILE_CREATE, RECIPE_CLONE, etc.
+  resourceId   String?
+  resourceName String?
+  details      String?  // JSON context
+}
+
 model User {
   id            String    @id @default(cuid())
   username      String    @unique

@@ -13,6 +13,7 @@ import fsSync from 'fs'
 import { Readable } from 'stream'
 import { pipeline } from 'stream/promises'
 import { revalidatePath } from 'next/cache'
+import { auditLog } from '@/lib/audit'
 
 export async function getSourcedImages(type: 'ISO' | 'CLOUD_IMAGE') {
   await requireAdmin()
@@ -68,6 +69,8 @@ export async function addNewImage(formData: FormData) {
         }
       })
 
+      await auditLog('IMAGE_ADD', { resourceId: image.id, resourceName: name, details: { source: 'url', url } })
+
       DownloadEngine.downloadIso(url, absolutePath, (progress) => {
         logEvents.emitProgress(image.id, progress)
         prisma.baseImage.update({
@@ -117,6 +120,8 @@ export async function addNewImage(formData: FormData) {
         }
       })
 
+      await auditLog('IMAGE_ADD', { resourceId: image.id, resourceName: name, details: { source: 'file', filename } })
+
       try {
         const fileStream = file.stream()
         const writeStream = fsSync.createWriteStream(absolutePath)
@@ -160,6 +165,7 @@ export async function deleteImage(id: string, type: string) {
   })
   
   if (image) {
+    await auditLog('IMAGE_DELETE', { resourceId: id, resourceName: image.name })
     for (const profile of image.profiles) {
       for (const job of profile.buildJobs) {
         if (job.outputPath && fsSync.existsSync(job.outputPath)) {

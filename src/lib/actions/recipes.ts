@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth-utils'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { auditLog } from '@/lib/audit'
 
 export async function createRecipe(formData: FormData) {
   const user = await requireAuth()
@@ -23,7 +24,7 @@ export async function createRecipe(formData: FormData) {
     ? runcmdRaw.split('\n').map(c => c.trim()).filter(c => c.length > 0)
     : []
 
-  await prisma.recipe.create({
+  const recipe = await prisma.recipe.create({
     data: {
       name,
       description: description || null,
@@ -33,6 +34,8 @@ export async function createRecipe(formData: FormData) {
       userId: user.id
     }
   })
+
+  await auditLog('RECIPE_CREATE', { resourceId: recipe.id, resourceName: recipe.name })
 
   revalidatePath('/settings/recipes')
   redirect('/settings/recipes')

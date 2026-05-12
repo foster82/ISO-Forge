@@ -6,7 +6,7 @@ import { clsx } from 'clsx'
 import { 
   Building, Globe, Shield, Wrench, Bell, 
   Database, Server, Users, HardDrive, 
-  ChevronRight, ArrowLeft 
+  ChevronRight, ArrowLeft, Activity
 } from 'lucide-react'
 
 interface SidebarItem {
@@ -44,6 +44,7 @@ export default function SettingsSidebar({ isAdmin }: { isAdmin: boolean }) {
       items: [
         { name: 'Authentication', href: '/settings/auth', icon: Shield, adminOnly: true },
         { name: 'Maintenance', href: '/settings/maintenance', icon: Database, adminOnly: true },
+        { name: 'Audit Logs', href: '/settings/audit', icon: Activity, adminOnly: true },
       ]
     },
     {

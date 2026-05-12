@@ -9,6 +9,7 @@ import fs from 'fs/promises'
 import fsSync from 'fs'
 import { buildQueue } from '@/lib/queue'
 import { checkUserQuota } from '@/lib/quota-utils'
+import { auditLog } from '@/lib/audit'
 
 export async function createProfile(formData: FormData) {
   const user = await requireAuth()
@@ -58,7 +59,7 @@ export async function createProfile(formData: FormData) {
     ? allowedGroupsRaw.split(',').map(g => g.trim()).filter(g => g.length > 0)
     : []
 
-  await prisma.profile.create({
+  const profile = await prisma.profile.create({
     data: {
       name,
       version,
@@ -78,6 +79,12 @@ export async function createProfile(formData: FormData) {
       gateway: gateway || null,
       dnsServers: dnsServers || null
     }
+  })
+
+  await auditLog('PROFILE_CREATE', { 
+    resourceId: profile.id, 
+    resourceName: profile.name,
+    details: { version, baseImageId }
   })
 
   redirect('/')
@@ -153,11 +160,15 @@ export async function updateProfile(id: string, formData: FormData) {
     }
   })
 
+  await auditLog('PROFILE_UPDATE', { resourceId: id, resourceName: name })
+
   redirect(`/profiles/${id}`)
 }
 
 export async function deleteProfile(id: string, _formData?: FormData) {
   await requireAdmin()
+  const profile = await prisma.profile.findUnique({ where: { id } })
+  if (!profile) return
   
   // Also delete associated build files
   const jobs = await prisma.buildJob.findMany({ where: { profileId: id } })
@@ -170,6 +181,8 @@ export async function deleteProfile(id: string, _formData?: FormData) {
       }
     }
   }
+  
+  await auditLog('PROFILE_DELETE', { resourceId: id, resourceName: profile.name })
   
   await prisma.buildJob.deleteMany({ where: { profileId: id } })
   await prisma.profile.delete({ where: { id } })
@@ -201,6 +214,12 @@ export async function startBuild(id: string) {
       status: 'PENDING',
       log: `Job queued for image type: ${profile.baseImage.imageType} (Version: ${profile.version})...\n`
     }
+  })
+
+  await auditLog('BUILD_START', { 
+    resourceId: job.id, 
+    resourceName: profile.name,
+    details: { profileId: id, version: profile.version }
   })
 
   const jobId = job.id
