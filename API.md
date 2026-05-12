@@ -70,6 +70,11 @@ Get detailed status and metadata for a specific job.
 }
 ```
 
+### Virtual Media (BMC)
+
+#### `GET /api/vmedia/[token]`
+Serves the generated ISO for a specific build job to a BMC (Baseboard Management Controller). This endpoint is used by Redfish-enabled servers to mount the ISO remotely. Tokens are short-lived (default 4 hours) and single-use in some contexts.
+
 ---
 
 # CLI Usage

@@ -38,7 +38,7 @@ ISO Forge implements two primary roles to ensure system security:
 - **Authentication:** [Auth.js (v5)](https://authjs.dev)
 - **Database:** [Prisma](https://prisma.io) with SQLite (Better-SQLite3 adapter)
 - **Styling:** [Tailwind CSS 4](https://tailwindcss.com) & [Lucide React](https://lucide.dev)
-- **Backend Tools:** `xorriso`, `7z`, `qemu-system-x86_64`, `virt-customize` (libguestfs)
+- **Backend Tools:** `xorriso`, `7z`, `qemu-system-x86_64`, `virt-customize` (libguestfs), Redfish API
 
 ## 📖 Documentation
 
@@ -103,6 +103,11 @@ sudo apt install p7zip-full xorriso qemu-system-x86 ovmf libguestfs-tools wget l
 - `src/components`: Reusable UI components.
 - `storage/`: Persistent storage for images and builds.
 - `prisma/`: Database schema and generated client.
+
+## 🛡️ License
+
+This project is open-source. Please refer to the LICENSE file for more details.
+`: Database schema and generated client.
 
 ## 🛡️ License
 
