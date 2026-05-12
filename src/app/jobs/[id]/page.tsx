@@ -158,6 +158,32 @@ export default async function JobDetails({ params }: { params: Promise<{ id: str
 
         {/* Logs */}
         <div className="grid grid-cols-1 gap-6">
+          {job.bootTestScreenshot && (
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-indigo-600" />
+                  Boot Test Confirmation Screenshot
+                </h3>
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  Captured at login/ready state
+                </span>
+              </div>
+              <div className="p-1 bg-slate-900 aspect-video relative group">
+                <img 
+                  src={job.bootTestScreenshot} 
+                  alt="Boot Test Screenshot" 
+                  className="w-full h-full object-contain"
+                />
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                  <p className="text-white text-xs font-bold px-4 py-2 bg-black/60 rounded-full backdrop-blur-sm">
+                    Verified Boot State
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <LogViewer 
             jobId={id}
             logType="build"

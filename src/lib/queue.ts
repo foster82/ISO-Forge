@@ -175,7 +175,7 @@ async function handleBuildJob(jobId: string, payload: Omit<BuildOptions, 'onLog'
   }
 }
 
-async function handleBootTestJob(jobId: string, payload: Omit<TestOptions, 'onLog'>) {
+async function handleBootTestJob(jobId: string, payload: Omit<TestOptions, 'onLog' | 'jobId'>) {
   try {
     await prisma.buildJob.update({
       where: { id: jobId },
@@ -187,10 +187,17 @@ async function handleBootTestJob(jobId: string, payload: Omit<TestOptions, 'onLo
 
     const success = await QEMURunner.testBoot({
       ...payload,
+      jobId: jobId,
       onLog: async (msg: string) => {
         logEvents.emitLog(jobId, msg, 'boot')
         prisma.$executeRaw`UPDATE BuildJob SET bootTestLog = IFNULL(bootTestLog, '') || ${msg} WHERE id = ${jobId}`.catch(e => {
           console.error('Failed to append boot test log:', e)
+        })
+      },
+      onScreenshot: async (screenshotPath: string) => {
+        await prisma.buildJob.update({
+          where: { id: jobId },
+          data: { bootTestScreenshot: screenshotPath }
         })
       }
     })

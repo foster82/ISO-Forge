@@ -70,6 +70,7 @@ model BuildJob {
   vncPort        Int?      // Dynamic VNC port for live debugging
   bootTestStatus String?   // PENDING, RUNNING, PASSED, FAILED
   bootTestLog    String?   @default("")
+  bootTestScreenshot String? // Path to the screenshot taken during boot test
   profileId      String
   profile        Profile   @relation(fields: [profileId], references: [id])
   userId         String?    // User who started the build

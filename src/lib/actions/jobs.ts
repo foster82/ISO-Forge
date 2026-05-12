@@ -88,7 +88,8 @@ export async function runBootTest(id: string, _formData?: FormData) {
       data: { 
         bootTestStatus: 'PENDING',
         bootTestLog: 'Job queued...\n',
-        vncPort: vncPort
+        vncPort: vncPort,
+        bootTestScreenshot: null
       }
     })
 
@@ -101,7 +102,10 @@ export async function runBootTest(id: string, _formData?: FormData) {
         imagePath: job.outputPath,
         imageType: job.profile.baseImage.imageType as 'ISO' | 'CLOUD_IMAGE',
         arch: job.profile.baseImage.arch,
-        vncDisplay: vncPort
+        vncDisplay: vncPort,
+        sshConfig: {
+          user: job.profile.username
+        }
       }
     })
 
