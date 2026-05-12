@@ -71,9 +71,10 @@ model BuildJob {
   profile        Profile   @relation(fields: [profileId], references: [id])
   userId         String?    // User who started the build
   user           User?      @relation(fields: [userId], references: [id])
+  virtualMediaTokens VirtualMediaToken[]
   createdAt      DateTime  @default(now())
   completedAt    DateTime?
-}
+  }
 
 model GlobalSettings {
   id           String   @id @default("default")
@@ -114,13 +115,33 @@ model Webhook {
 }
 
 model OpenStackProvider {
-  id          String   @id @default(cuid())
-  name        String   // e.g. "Production Cloud", "Dev Lab"
-  authUrl     String
-  region      String   @default("RegionOne")
-  domainName  String   @default("Default")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String   @id @default(cuid())
+  name       String // e.g. "Production Cloud", "Dev Lab"
+  authUrl    String
+  region     String   @default("RegionOne")
+  domainName String   @default("Default")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model BareMetalProvider {
+  id           String   @id @default(cuid())
+  name         String // e.g. "Web-Node-01"
+  providerType String // CIMC, IDRAC, GENERIC_REDFISH
+  managementIp String // IP or Hostname
+  username     String
+  password     String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model VirtualMediaToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  jobId     String
+  job       BuildJob @relation(fields: [jobId], references: [id])
+  expiresAt DateTime
+  createdAt DateTime @default(now())
 }
 
 model User {
