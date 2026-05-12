@@ -113,8 +113,26 @@ export class RedfishEngine {
     return { success: false, message: `Failed to eject ISO: ${result.data || result.error}` }
   }
 
-  static async powerCycle(provider: BareMetalProvider): Promise<RedfishResponse> {
-    // Get Systems
+  static async getSystemStatus(provider: BareMetalProvider) {
+    const systemsResult = await this.request(provider, '/redfish/v1/Systems')
+    if (!systemsResult.success || !systemsResult.data.Members?.length) return { success: false, message: 'Could not locate System endpoint.' }
+
+    const systemId = systemsResult.data.Members[0]['@odata.id']
+    const statusResult = await this.request(provider, systemId)
+
+    if (statusResult.success) {
+      return { 
+        success: true, 
+        powerState: statusResult.data.PowerState, // On, Off, PoweringOn, PoweringOff
+        health: statusResult.data.Status?.Health, // OK, Warning, Critical
+        model: statusResult.data.Model,
+        serialNumber: statusResult.data.SerialNumber
+      }
+    }
+    return { success: false, message: `Failed to fetch system status: ${statusResult.data || statusResult.error}` }
+  }
+
+  static async powerAction(provider: BareMetalProvider, action: 'On' | 'ForceOff' | 'GracefulShutdown' | 'ForceRestart' | 'PushPowerButton'): Promise<RedfishResponse> {
     const systemsResult = await this.request(provider, '/redfish/v1/Systems')
     if (!systemsResult.success || !systemsResult.data.Members?.length) return { success: false, message: 'Could not locate System endpoint.' }
 
@@ -123,12 +141,16 @@ export class RedfishEngine {
 
     const result = await this.request(provider, actionPath, {
       method: 'POST',
-      body: JSON.stringify({ ResetType: 'ForceRestart' })
+      body: JSON.stringify({ ResetType: action })
     })
 
     if (result.success) {
-      return { success: true, message: 'Server power cycle command sent.' }
+      return { success: true, message: `Command '${action}' sent successfully.` }
     }
-    return { success: false, message: `Failed to reboot server: ${result.data || result.error}` }
+    return { success: false, message: `Failed to execute ${action}: ${result.data || result.error}` }
+  }
+
+  static async powerCycle(provider: BareMetalProvider): Promise<RedfishResponse> {
+    return this.powerAction(provider, 'ForceRestart')
   }
 }

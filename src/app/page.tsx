@@ -78,6 +78,9 @@ export default async function Dashboard() {
               <Link href="/images" className="text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">
                 Base Images
               </Link>
+              <Link href="/recipes" className="text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">
+                Public Recipes
+              </Link>
               <Link href="/settings" className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-slate-50 rounded-lg transition-all" title="Settings">
                 <Settings className="w-5 h-5" />
               </Link>

@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { validateApiRequest } from '../../../images/route'
 import { buildQueue } from '@/lib/queue'
+import { checkUserQuota } from '@/lib/quota-utils'
 import path from 'path'
 import fs from 'fs/promises'
 
@@ -10,8 +11,13 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const user = await validateApiRequest(request)
-  if (!user) {
+  if (!user || !user.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const quota = await checkUserQuota(user.id)
+  if (!quota.allowed) {
+    return NextResponse.json({ error: quota.message }, { status: 403 })
   }
 
   const { id } = await params

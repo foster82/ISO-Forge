@@ -8,6 +8,7 @@ import path from 'path'
 import fs from 'fs/promises'
 import fsSync from 'fs'
 import { buildQueue } from '@/lib/queue'
+import { checkUserQuota } from '@/lib/quota-utils'
 
 export async function createProfile(formData: FormData) {
   const user = await requireAuth()
@@ -178,6 +179,12 @@ export async function deleteProfile(id: string, _formData?: FormData) {
 
 export async function startBuild(id: string) {
   const user = await requireAuth()
+  if (!user.id) throw new Error("User ID missing")
+  
+  const quota = await checkUserQuota(user.id)
+  if (!quota.allowed) {
+    throw new Error(quota.message)
+  }
   
   const profile = await prisma.profile.findUnique({
     where: { id },

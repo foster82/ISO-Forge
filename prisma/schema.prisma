@@ -28,6 +28,9 @@ model Recipe {
   description String?
   packages    String   // JSON array of strings
   runcmd      String   @default("[]") // JSON array of strings
+  isPublic    Boolean  @default(false)
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
@@ -89,6 +92,7 @@ model GlobalSettings {
   // Regional Defaults
   defaultTimezone    String   @default("Europe/London")
   defaultLocale      String   @default("en_GB.UTF-8")
+  defaultStorageQuotaMB Int   @default(0) // 0 = unlimited
   
   // Auth Settings
   authType     String   @default("LOCAL") // LOCAL, LDAP, BOTH
@@ -156,6 +160,7 @@ model User {
   groups        String    @default("[]") // JSON array of strings
   profiles      Profile[]
   buildJobs     BuildJob[]
+  recipes       Recipe[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }

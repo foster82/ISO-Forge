@@ -74,3 +74,19 @@ export async function deployToBareMetal(jobId: string, providerId: string, force
 
   return { success: true, message: `Successfully deployed ISO to ${provider.name}.` }
 }
+
+export async function getServerStatusAction(id: string) {
+  await requireAuth()
+  const provider = await prisma.bareMetalProvider.findUnique({ where: { id } })
+  if (!provider) return { success: false, message: 'Provider not found' }
+
+  return await RedfishEngine.getSystemStatus(provider)
+}
+
+export async function controlServerPowerAction(id: string, action: 'On' | 'ForceOff' | 'ForceRestart') {
+  await requireAdmin()
+  const provider = await prisma.bareMetalProvider.findUnique({ where: { id } })
+  if (!provider) return { success: false, message: 'Provider not found' }
+
+  return await RedfishEngine.powerAction(provider, action)
+}

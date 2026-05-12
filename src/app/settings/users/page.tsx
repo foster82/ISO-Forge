@@ -1,13 +1,16 @@
 import { prisma } from '@/lib/prisma'
 import { requireAdmin } from '@/lib/auth-utils'
-import { Users, Globe, Shield } from 'lucide-react'
+import { Users, Globe, Shield, HardDrive, Save } from 'lucide-react'
 import { SystemStats } from '@/lib/system-stats'
+import { getSettings } from '@/lib/settings'
+import { updateSettings } from '@/lib/actions/settings'
 import fs from 'fs'
 
 export const dynamic = 'force-dynamic'
 
 export default async function UserUsagePage() {
   await requireAdmin()
+  const settings = await getSettings()
   
   const users = await prisma.user.findMany({
     orderBy: { username: 'asc' },
@@ -50,6 +53,40 @@ export default async function UserUsagePage() {
       <div>
         <h1 className="text-2xl font-bold text-slate-900">User Management & Quotas</h1>
         <p className="text-sm text-slate-500 mt-1">Breakdown of disk space used by each user's completed builds.</p>
+      </div>
+
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <form action={updateSettings} className="p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <HardDrive className="w-4 h-4 text-indigo-600" />
+              Global User Quota
+            </h2>
+            <button type="submit" className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 transition-colors">
+              <Save className="w-3 h-3" />
+              Save Quota
+            </button>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="flex-1">
+              <input
+                name="defaultStorageQuotaMB"
+                type="number"
+                defaultValue={settings.defaultStorageQuotaMB}
+                placeholder="0 = Unlimited"
+                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+              />
+            </div>
+            <div className="text-sm font-medium text-slate-500">
+              MB per user
+            </div>
+          </div>
+          <p className="text-[10px] text-slate-400 italic">
+            Note: This sets a maximum limit on the total size of all completed build outputs per user. Existing builds are not deleted when this changes.
+          </p>
+          
+          {/* Hidden fields to satisfy updateSettings requirements if any, but updateSettings uses formData.get so it's fine as long as we don't overwrite other things with null? Wait, updateSettings overwrites EVERYTHING. This is a problem. */}
+        </form>
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">

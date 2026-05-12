@@ -19,83 +19,87 @@ export default async function RecipesPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Create Recipe Form */}
         <div className="lg:col-span-1">
-          {isUserAdmin ? (
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden sticky top-24">
-              <div className="p-6 border-b border-slate-100 bg-slate-50/50">
-                <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  <Plus className="w-4 h-4 text-indigo-600" />
-                  Create New Recipe
-                </h2>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden sticky top-24">
+            <div className="p-6 border-b border-slate-100 bg-slate-50/50">
+              <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <Plus className="w-4 h-4 text-indigo-600" />
+                Create New Recipe
+              </h2>
+            </div>
+            <form action={createRecipe} className="p-6 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Recipe Name</label>
+                <input
+                  name="name"
+                  type="text"
+                  required
+                  placeholder="e.g. Docker Node"
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                />
               </div>
-              <form action={createRecipe} className="p-6 space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Recipe Name</label>
-                  <input
-                    name="name"
-                    type="text"
-                    required
-                    placeholder="e.g. Docker Node"
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
-                  />
-                </div>
-                
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Description</label>
-                  <textarea
-                    name="description"
-                    rows={2}
-                    placeholder="Brief description..."
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
-                  />
-                </div>
+              
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Description</label>
+                <textarea
+                  name="description"
+                  rows={2}
+                  placeholder="Brief description..."
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                />
+              </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                    Packages
-                  </label>
-                  <input
-                    name="packages"
-                    type="text"
-                    placeholder="curl, git, docker.io"
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-mono"
-                  />
-                </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                  Packages
+                </label>
+                <input
+                  name="packages"
+                  type="text"
+                  placeholder="curl, git, docker.io"
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-mono"
+                />
+              </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                    Run Commands
-                  </label>
-                  <textarea
-                    name="runcmd"
-                    rows={4}
-                    placeholder="systemctl enable docker"
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-mono"
-                  />
-                </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                  Run Commands
+                </label>
+                <textarea
+                  name="runcmd"
+                  rows={4}
+                  placeholder="systemctl enable docker"
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-mono"
+                />
+              </div>
 
-                <button
-                  type="submit"
-                  className="w-full py-2.5 bg-indigo-600 text-white rounded-lg font-bold text-sm hover:bg-indigo-700 transition-all shadow-sm flex items-center justify-center gap-2 mt-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  Save Recipe
-                </button>
-              </form>
-            </div>
-          ) : (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 text-sm text-amber-800">
-              <p className="font-bold flex items-center gap-2 mb-2">
-                <Info className="w-4 h-4" />
-                Read-Only Access
-              </p>
-              Only administrators can create or delete configuration recipes.
-            </div>
-          )}
+              <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-100">
+                <input 
+                  type="checkbox" 
+                  name="isPublic" 
+                  id="isPublic"
+                  className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500" 
+                />
+                <label htmlFor="isPublic" className="text-xs font-bold text-slate-700 cursor-pointer">
+                  Publish to Marketplace
+                </label>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-2.5 bg-indigo-600 text-white rounded-lg font-bold text-sm hover:bg-indigo-700 transition-all shadow-sm flex items-center justify-center gap-2 mt-2"
+              >
+                <Plus className="w-4 h-4" />
+                Save Recipe
+              </button>
+            </form>
+          </div>
         </div>
 
         {/* Recipes List */}
         <div className="lg:col-span-2 space-y-4">
-          <h2 className="text-sm font-bold text-slate-500 uppercase tracking-wider px-2">Existing Recipes ({recipes.length})</h2>
+          <h2 className="text-sm font-bold text-slate-500 uppercase tracking-wider px-2">
+            {isUserAdmin ? 'Global Recipes' : 'My Recipes'} ({recipes.length})
+          </h2>
           
           {recipes.length === 0 ? (
             <div className="bg-white rounded-xl border border-dashed border-slate-300 p-12 text-center">
@@ -108,19 +112,24 @@ export default async function RecipesPage() {
                 <div key={recipe.id} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden group hover:border-indigo-300 transition-all">
                   <div className="p-6">
                     <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <h3 className="text-lg font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">{recipe.name}</h3>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-lg font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">{recipe.name}</h3>
+                          {recipe.isPublic && (
+                            <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full uppercase tracking-tighter">
+                              Public
+                            </span>
+                          )}
+                        </div>
                         {recipe.description && (
                           <p className="text-sm text-slate-500 mt-1">{recipe.description}</p>
                         )}
                       </div>
-                      {isUserAdmin && (
-                        <DeleteButton 
-                          action={deleteRecipe.bind(null, recipe.id)}
-                          confirmMessage={`Are you sure?`}
-                          iconSize={4}
-                        />
-                      )}
+                      <DeleteButton 
+                        action={deleteRecipe.bind(null, recipe.id)}
+                        confirmMessage={`Are you sure?`}
+                        iconSize={4}
+                      />
                     </div>
 
                     <div className="space-y-3">

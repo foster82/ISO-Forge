@@ -27,46 +27,35 @@ export async function testLdapConnection(formData: FormData) {
 export async function updateSettings(formData: FormData) {
   await requireAdmin()
   
-  const companyName = formData.get('companyName') as string
-  const companyLogo = formData.get('companyLogo') as string
-  const authType = formData.get('authType') as string
-  const defaultTimezone = formData.get('defaultTimezone') as string
-  const defaultLocale = formData.get('defaultLocale') as string
+  const data: any = {}
   
-  const ldapUrl = formData.get('ldapUrl') as string
-  const ldapBaseDn = formData.get('ldapBaseDn') as string
-  const ldapBindDn = formData.get('ldapBindDn') as string
-  const ldapBindPw = formData.get('ldapBindPw') as string
-  const ldapFilter = formData.get('ldapFilter') as string
-  const ldapAdminGroup = formData.get('ldapAdminGroup') as string
-  const ldapUserGroup = formData.get('ldapUserGroup') as string
+  if (formData.has('companyName')) data.companyName = formData.get('companyName') as string
+  if (formData.has('companyLogo')) data.companyLogo = formData.get('companyLogo') as string || null
+  if (formData.has('authType')) data.authType = formData.get('authType') as string
+  if (formData.has('defaultTimezone')) data.defaultTimezone = formData.get('defaultTimezone') as string
+  if (formData.has('defaultLocale')) data.defaultLocale = formData.get('defaultLocale') as string
+  if (formData.has('defaultStorageQuotaMB')) data.defaultStorageQuotaMB = parseInt(formData.get('defaultStorageQuotaMB') as string) || 0
   
-  const jobRetentionDays = parseInt(formData.get('jobRetentionDays') as string) || 30
-  const buildRetentionCount = parseInt(formData.get('buildRetentionCount') as string) || 10
-  const autoCleanupEnabled = formData.get('autoCleanupEnabled') === 'on'
+  if (formData.has('ldapUrl')) data.ldapUrl = formData.get('ldapUrl') as string || null
+  if (formData.has('ldapBaseDn')) data.ldapBaseDn = formData.get('ldapBaseDn') as string || null
+  if (formData.has('ldapBindDn')) data.ldapBindDn = formData.get('ldapBindDn') as string || null
+  if (formData.has('ldapBindPw')) data.ldapBindPw = formData.get('ldapBindPw') as string || null
+  if (formData.has('ldapFilter')) data.ldapFilter = formData.get('ldapFilter') as string || "(uid={{username}})"
+  if (formData.has('ldapAdminGroup')) data.ldapAdminGroup = formData.get('ldapAdminGroup') as string || null
+  if (formData.has('ldapUserGroup')) data.ldapUserGroup = formData.get('ldapUserGroup') as string || null
+  
+  if (formData.has('jobRetentionDays')) data.jobRetentionDays = parseInt(formData.get('jobRetentionDays') as string) || 30
+  if (formData.has('buildRetentionCount')) data.buildRetentionCount = parseInt(formData.get('buildRetentionCount') as string) || 10
+  if (formData.has('autoCleanupEnabled')) data.autoCleanupEnabled = formData.get('autoCleanupEnabled') === 'on'
 
   await prisma.globalSettings.update({
     where: { id: 'default' },
-    data: {
-      companyName,
-      companyLogo: companyLogo || null,
-      authType,
-      defaultTimezone: defaultTimezone || 'UTC',
-      defaultLocale: defaultLocale || 'en_US.UTF-8',
-      ldapUrl: ldapUrl || null,
-      ldapBaseDn: ldapBaseDn || null,
-      ldapBindDn: ldapBindDn || null,
-      ldapBindPw: ldapBindPw || null,
-      ldapFilter: ldapFilter || "(uid={{username}})",
-      ldapAdminGroup: ldapAdminGroup || null,
-      ldapUserGroup: ldapUserGroup || null,
-      jobRetentionDays,
-      buildRetentionCount,
-      autoCleanupEnabled
-    }
+    data
   })
 
   revalidatePath('/')
   revalidatePath('/settings')
-  redirect('/')
+  // We should not redirect if we are updating from a specific subpage?
+  // But redirect('/') was there. Let's keep it or remove it if we want to stay on the page.
+  // redirect('/')
 }
