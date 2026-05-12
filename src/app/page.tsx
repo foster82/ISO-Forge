@@ -78,11 +78,9 @@ export default async function Dashboard() {
               <Link href="/images" className="text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">
                 Base Images
               </Link>
-              {isUserAdmin && (
-                <Link href="/settings" className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-slate-50 rounded-lg transition-all" title="Settings">
-                  <Settings className="w-5 h-5" />
-                </Link>
-              )}
+              <Link href="/settings" className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-slate-50 rounded-lg transition-all" title="Settings">
+                <Settings className="w-5 h-5" />
+              </Link>
             </nav>
             <div className="flex items-center gap-2">
               <Link href="/profiles/new?type=ISO" className="inline-flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-indigo-700 transition-colors shadow-sm text-sm">

@@ -28,7 +28,8 @@ ISO Forge implements two primary roles to ensure system security:
   - View dashboard and image lists.
   - Create and edit **Profiles**.
   - Start **Build Jobs** and run **Boot Tests**.
-  - *Restricted:* Cannot access settings, add/delete base images, or delete records.
+  - **Access Settings:** View general branding, manage recipes, and view build history.
+  - *Restricted:* Cannot manage LDAP/Auth, Infrastructure, Maintenance, or delete shared records.
 
 > **Default Admin Credentials:** `admin` / `admin` (Change these immediately upon setup!)
 
